@@ -1,0 +1,29 @@
+/usr/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/usr/bin/make -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/bin/g++ -G "CodeBlocks - Unix Makefiles" /tmp/tmp.IyJU8EsJ7j
+CMake Warning at CMakeLists.txt:42 (message):
+  BusTub/main couldn't find clang-format.
+
+
+CMake Warning at CMakeLists.txt:55 (message):
+  BusTub/main couldn't find clang-tidy.
+
+
+-- BusTub/main found cpplint at /tmp/tmp.IyJU8EsJ7j/build_support/cpplint.py
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /tmp/tmp.IyJU8EsJ7j/cmake-build-debug-remote-host/googletest-download
+[ 11%] Performing update step for 'googletest'
+[ 22%] No patch step for 'googletest'
+[ 33%] No configure step for 'googletest'
+[ 44%] No build step for 'googletest'
+[ 55%] No install step for 'googletest'
+[ 66%] No test step for 'googletest'
+[ 77%] Completed 'googletest'
+[100%] Built target googletest
+-- CMAKE_CXX_FLAGS:  -fPIC -Wall -Wextra -Werror -march=native -Wno-unused-parameter -Wno-attributes
+-- CMAKE_CXX_FLAGS_DEBUG: -g -O0 -ggdb -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls
+-- CMAKE_EXE_LINKER_FLAGS:  -fPIC
+-- CMAKE_SHARED_LINKER_FLAGS:  -fPIC
+-- BusTub/test found valgrind at /usr/bin/valgrind
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /tmp/tmp.IyJU8EsJ7j/cmake-build-debug-remote-host
