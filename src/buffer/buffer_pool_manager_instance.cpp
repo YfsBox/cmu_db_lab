@@ -85,12 +85,18 @@ Page *BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) {
     return nullptr;
   }
   frame_id_t rframe_id;
-  if (findFreePage(&rframe_id)) { //找不到freepage
+  if (!findFreePage(&rframe_id)) { //找不到freepage
+    //LOG_WARN("return nullptr");
     return nullptr;
   }
+  if (pages_[rframe_id].IsDirty()) {
+    disk_manager_->WritePage(pages_[rframe_id].GetPageId(),pages_[rframe_id].GetData());
+  }
+  page_table_.erase(pages_[rframe_id].GetPageId());
   *page_id = AllocatePage();
   resetPage(rframe_id);
   pages_[rframe_id].page_id_ = *page_id;
+  pages_[rframe_id].pin_count_ = 1;
   //add to table
   page_table_[*page_id] = rframe_id;
   return pages_ + rframe_id;
@@ -101,20 +107,23 @@ page_id_t BufferPoolManagerInstance::frame2page(const frame_id_t fid) const {
 }
 
 void BufferPoolManagerInstance::resetPage(const frame_id_t frame_id) {
-  pages_[frame_id].ResetMemory();
+  LOG_DEBUG("the frame_id is %d",frame_id);
   pages_[frame_id].page_id_ = INVALID_PAGE_ID;
   pages_[frame_id].pin_count_ = 0;
   pages_[frame_id].is_dirty_ = false;
+  pages_[frame_id].ResetMemory();
 }
 
 bool BufferPoolManagerInstance::findFreePage(frame_id_t *frame_id) {
+  //LOG_DEBUG("...");
   if (free_list_.empty()) {
     if(auto ok = replacer_->Victim(frame_id);!ok) {
-      LOG_ERROR("not find victim page from replacer");
+      LOG_WARN("not find victim page from replacer");
       return false;
     }
   } else {
     *frame_id = free_list_.front();//首先应该获取,但是是否应该删除呢?
+    free_list_.pop_front();
   }
   return true;
 }
@@ -133,6 +142,9 @@ Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
   if (pageit != page_table_.end()) { //如果这一页存在
     frame_id_t f_id = pageit->second;
     pages_[f_id].pin_count_ ++;
+    if (pages_[f_id].pin_count_ == 1) {
+      replacer_->Pin(f_id);
+    }
     return pages_ + f_id;
   } else {
     if (!findFreePage(&r_fid)) { //这种情况就是找不到的
@@ -148,6 +160,8 @@ Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
   page_table_[page_id] = r_fid;
   //插入一个page
   pages_[r_fid].page_id_ = page_id;
+  pages_[r_fid].pin_count_ = 1;
+  replacer_->Pin(r_fid);
   disk_manager_->ReadPage(page_id,pages_[r_fid].GetData());
   return pages_ + r_fid;
 }
@@ -187,6 +201,9 @@ bool BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) {
   }
   pages_[frame_id].pin_count_ --;
   pages_[frame_id].is_dirty_ = is_dirty;
+  if (pages_[frame_id].pin_count_ == 0) {
+    replacer_->Unpin(frame_id);
+  }
   return true;
 }
 

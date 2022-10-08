@@ -38,6 +38,7 @@ TEST(BufferPoolManagerInstanceTest,BinaryDataTest) {
   // Scenario: The buffer pool is empty. We should be able to create a new page.
   ASSERT_NE(nullptr, page0);
   EXPECT_EQ(0, page_id_temp);
+  //printf("ok\n");
 
   char random_binary_data[PAGE_SIZE];
   // Generate random binary data
