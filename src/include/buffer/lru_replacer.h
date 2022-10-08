@@ -14,7 +14,7 @@
 
 #include <list>
 #include <mutex>  // NOLINT
-#include <vector>
+#include <unordered_map>
 
 #include "buffer/replacer.h"
 #include "common/config.h"
@@ -30,6 +30,7 @@ class LRUReplacer : public Replacer {
    * Create a new LRUReplacer.
    * @param num_pages the maximum number of pages the LRUReplacer will be required to store
    */
+  typedef std::list<frame_id_t>::iterator frameIt;
   explicit LRUReplacer(size_t num_pages);
 
   /**
@@ -47,6 +48,9 @@ class LRUReplacer : public Replacer {
 
  private:
   // TODO(student): implement me!
+  std::list<frame_id_t> frames_;
+  std::unordered_map<frame_id_t,frameIt> itmap_; //这一部分采用迭代器的危险之处在于，如果不能控制严格的头进首出，就会导致迭代器无效
+  const size_t capacity_;
 };
 
 }  // namespace bustub
