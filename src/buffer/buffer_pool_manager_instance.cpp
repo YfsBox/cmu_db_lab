@@ -57,6 +57,7 @@ bool BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) { //这里的page_
   }
   //能够找到
   disk_manager_->WritePage(page_id,pages_[it->second].GetData());
+
   return true;
 }
 
@@ -89,10 +90,6 @@ Page *BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) {
     //LOG_WARN("return nullptr");
     return nullptr;
   }
-  if (pages_[rframe_id].IsDirty()) {
-    disk_manager_->WritePage(pages_[rframe_id].GetPageId(),pages_[rframe_id].GetData());
-  }
-  page_table_.erase(pages_[rframe_id].GetPageId());
   *page_id = AllocatePage();
   resetPage(rframe_id);
   pages_[rframe_id].page_id_ = *page_id;
@@ -117,10 +114,15 @@ void BufferPoolManagerInstance::resetPage(const frame_id_t frame_id) {
 bool BufferPoolManagerInstance::findFreePage(frame_id_t *frame_id) {
   //LOG_DEBUG("...");
   if (free_list_.empty()) {
-    if(auto ok = replacer_->Victim(frame_id);!ok) {
+    if(auto vicok = replacer_->Victim(frame_id);!vicok) {
       LOG_WARN("not find victim page from replacer");
       return false;
     }
+    page_id_t rpg_id = pages_[*frame_id].GetPageId();
+    if (pages_[*frame_id].IsDirty()) {
+      disk_manager_->WritePage(rpg_id,pages_[*frame_id].GetData());
+    } //写入磁盘
+    page_table_.erase(rpg_id);
   } else {
     *frame_id = free_list_.front();//首先应该获取,但是是否应该删除呢?
     free_list_.pop_front();
@@ -152,11 +154,6 @@ Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
     }
   }
   //到了这里已经找到一个可用的R了
-  page_id_t rpgid = frame2page(r_fid);
-  if (pages_[r_fid].IsDirty()) {
-    disk_manager_->WritePage(rpgid,pages_[r_fid].GetData());
-  } //写入磁盘
-  page_table_.erase(rpgid);
   page_table_[page_id] = r_fid;
   //插入一个page
   pages_[r_fid].page_id_ = page_id;
@@ -184,9 +181,10 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
       page_table_.erase(page_it);//移除这一项
       resetPage(frame_id);
       free_list_.push_back(frame_id);
+      replacer_->Unpin(frame_id);
     }
   }
-  return false;
+  return true;
 }
 
 bool BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) {
