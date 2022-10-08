@@ -25,6 +25,7 @@ log_manager_(log_manager){
    for (size_t i = 0; i < num_instances_; i ++) {
      instances_[i] = new BufferPoolManagerInstance(pool_size_,num_instances_,i,disk_manager_,log_manager_);
    } //利用了多态
+   next_instance_ = 0;
 }
 
 // Update constructor to destruct all BufferPoolManagerInstances and deallocate any associated memory
@@ -68,16 +69,18 @@ Page *ParallelBufferPoolManager::NewPgImp(page_id_t *page_id) {
   // starting index and return nullptr
   // 2.   Bump the starting index (mod number of instances) to start search at a different BPMI each time this function
   // is called
-  static auto index = 0 % num_instances_;
-  auto start = index;
+  auto start = next_instance_;
   Page *page = nullptr;
   while (true) {
-    page = instances_[index]->NewPage(page_id);
+    //LOG_DEBUG("the next_instance is %lu,the start is %lu",next_instance_,start);
+    page = instances_[next_instance_]->NewPage(page_id);
     if (page != nullptr) {
+      //LOG_DEBUG("find new page");
       break;
     }
-    index = (index + 1) % num_instances_;
-    if (index == start) {
+    next_instance_ = (next_instance_ + 1) % num_instances_;
+    //LOG_DEBUG("the next_instance is %lu,the start is %lu",next_instance_,start);
+    if (next_instance_ == start) {
       break;
     }
   }

@@ -89,6 +89,7 @@ class ParallelBufferPoolManager : public BufferPoolManager {
   void FlushAllPgsImp() override;
 
   size_t num_instances_;
+  size_t next_instance_;
   std::vector<BufferPoolManager*> instances_;
   size_t pool_size_;
   DiskManager *disk_manager_;
