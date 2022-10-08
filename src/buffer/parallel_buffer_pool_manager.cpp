@@ -12,6 +12,7 @@
 
 #include "buffer/parallel_buffer_pool_manager.h"
 #include "buffer/buffer_pool_manager_instance.h"
+#include "../include/common/logger.h"
 
 namespace bustub {
 
@@ -22,7 +23,7 @@ log_manager_(log_manager){
   // Allocate and create individual BufferPoolManagerInstances
    instances_.resize(num_instances_);
    for (size_t i = 0; i < num_instances_; i ++) {
-     instances_[i] = new BufferPoolManagerInstance(pool_size_,disk_manager_,log_manager_);
+     instances_[i] = new BufferPoolManagerInstance(pool_size_,num_instances_,i,disk_manager_,log_manager_);
    } //利用了多态
 }
 
@@ -41,6 +42,7 @@ size_t ParallelBufferPoolManager::GetPoolSize() {
 BufferPoolManager *ParallelBufferPoolManager::GetBufferPoolManager(page_id_t page_id) {
   // Get BufferPoolManager responsible for handling given page id. You can use this method in your other methods.
   auto ins_id = page_id % num_instances_;
+  LOG_DEBUG("get buffer manager %lu",ins_id);
   return instances_[ins_id];
 }
 
@@ -68,17 +70,18 @@ Page *ParallelBufferPoolManager::NewPgImp(page_id_t *page_id) {
   // is called
   static auto index = 0 % num_instances_;
   auto start = index;
+  Page *page = nullptr;
   while (true) {
-    Page* page = instances_[index]->NewPage(page_id);
+    page = instances_[index]->NewPage(page_id);
     if (page != nullptr) {
-      return page;
+      break;
     }
     index = (index + 1) % num_instances_;
     if (index == start) {
       break;
     }
   }
-  return nullptr;
+  return page;
 }
 
 bool ParallelBufferPoolManager::DeletePgImp(page_id_t page_id) {

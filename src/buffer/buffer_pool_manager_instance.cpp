@@ -78,7 +78,6 @@ Page *BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) {
   // 2.   Pick a victim page P from either the free list or the replacer. Always pick from the free list first.
   // 3.   Update P's metadata, zero out memory and add P to the page table.
   // 4.   Set the page ID output parameter. Return a pointer to P.
-  //
   latch_.lock();
   bool is_allpin = true;
   for (size_t i = 0; i < pool_size_; i ++) {
@@ -102,7 +101,8 @@ Page *BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) {
   pages_[rframe_id].page_id_ = *page_id;
   pages_[rframe_id].pin_count_ = 1;
   //add to table
-  page_table_[*page_id] = rframe_id;
+  page_table_.insert(std::make_pair(*page_id,rframe_id));
+  LOG_DEBUG("page_id %d has add to table",*page_id);
   latch_.unlock();
   return pages_ + rframe_id;
 }
@@ -170,7 +170,7 @@ Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
     }
   }
   //到了这里已经找到一个可用的R了
-  page_table_[page_id] = r_fid;
+  page_table_.insert(std::make_pair(page_id,r_fid));
   //插入一个page
   pages_[r_fid].page_id_ = page_id;
   pages_[r_fid].pin_count_ = 1;
@@ -212,7 +212,7 @@ bool BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) {
   latch_.lock();
   auto page_it = page_table_.find(page_id);
   if (page_it == page_table_.end()) {
-    LOG_WARN("can't find from pagetable");
+    LOG_WARN("can't find page_id %d from pagetable",page_id);
     latch_.unlock();
     return false;
   }
@@ -222,7 +222,7 @@ bool BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) {
     return false;
   }
   pages_[frame_id].pin_count_ --;
-  pages_[frame_id].is_dirty_ = is_dirty;
+  pages_[frame_id].is_dirty_ |= is_dirty;
   if (pages_[frame_id].pin_count_ == 0) {
     replacer_->Unpin(frame_id);
   }

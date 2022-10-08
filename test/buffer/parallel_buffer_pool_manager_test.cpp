@@ -18,7 +18,8 @@
 #include "gtest/gtest.h"
 
 namespace bustub {
-
+//关于第一个测试的话,首先只处理page0,在page0上进行写并且进行检查
+//然后一直创建的新的page，导致pool变满为止
 // NOLINTNEXTLINE
 // Check whether pages containing terminal characters can be recovered
 TEST(ParallelBufferPoolManagerTest, BinaryDataTest) {
@@ -58,13 +59,13 @@ TEST(ParallelBufferPoolManagerTest, BinaryDataTest) {
   for (size_t i = 1; i < buffer_pool_size * num_instances; ++i) {
     EXPECT_NE(nullptr, bpm->NewPage(&page_id_temp));
   }
-
   // Scenario: Once the buffer pool is full, we should not be able to create any new pages.
   for (size_t i = buffer_pool_size; i < buffer_pool_size * num_instances * 2; ++i) {
     EXPECT_EQ(nullptr, bpm->NewPage(&page_id_temp));
   }
 
   // Scenario: After unpinning pages {0, 1, 2, 3, 4} we should be able to create 5 new pages
+  printf("begin upin\n");
   for (int i = 0; i < 5; ++i) {
     EXPECT_EQ(true, bpm->UnpinPage(i, true));
     bpm->FlushPage(i);
@@ -73,9 +74,12 @@ TEST(ParallelBufferPoolManagerTest, BinaryDataTest) {
     EXPECT_NE(nullptr, bpm->NewPage(&page_id_temp));
     bpm->UnpinPage(page_id_temp, false);
   }
+  printf("end unpin\n");
 
   // Scenario: We should be able to fetch the data we wrote a while ago.
+  printf("ok\n");
   page0 = bpm->FetchPage(0);
+  //这里居然找不到,看来是因为前面的unpin没有导致的
   EXPECT_EQ(0, memcmp(page0->GetData(), random_binary_data, PAGE_SIZE));
   EXPECT_EQ(true, bpm->UnpinPage(0, true));
 
@@ -132,7 +136,6 @@ TEST(ParallelBufferPoolManagerTest, SampleTest) {
   for (int i = 0; i < 4; ++i) {
     EXPECT_NE(nullptr, bpm->FetchPage(i));
   }
-
   // Scenario: We should be able to fetch the data we wrote a while ago.
   page4 = bpm->FetchPage(4);
   EXPECT_EQ(0, strcmp(page4->GetData(), "World"));
