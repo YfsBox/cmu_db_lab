@@ -120,8 +120,8 @@ class BufferPoolManagerInstance : public BufferPoolManager {
    * @param page_id
    */
   void ValidatePageId(page_id_t page_id) const;
-  void resetPage(const frame_id_t frame_id);
-  bool findFreePage(frame_id_t *frame_id);
+  void ResetPage(const frame_id_t &frame_id);
+  bool FindFreePage(frame_id_t *frame_id);
   bool HavePage(page_id_t page_id);
 
   /** Number of pages in the buffer pool. */

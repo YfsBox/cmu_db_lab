@@ -11,11 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #pragma once
+#include <vector>
 #include "buffer/buffer_pool_manager.h"
 #include "recovery/log_manager.h"
 #include "storage/disk/disk_manager.h"
 #include "storage/page/page.h"
-#include <vector>
+
 
 namespace bustub {
 
@@ -94,5 +95,6 @@ class ParallelBufferPoolManager : public BufferPoolManager {
   size_t pool_size_;
   DiskManager *disk_manager_;
   LogManager *log_manager_;
+  std::mutex latch_;
 };
 }  // namespace bustub

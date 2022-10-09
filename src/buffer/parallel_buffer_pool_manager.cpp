@@ -18,19 +18,19 @@ namespace bustub {
 
 ParallelBufferPoolManager::ParallelBufferPoolManager(size_t num_instances, size_t pool_size, DiskManager *disk_manager,
                                                      LogManager *log_manager):num_instances_(num_instances),
-pool_size_(pool_size),disk_manager_(disk_manager),
-log_manager_(log_manager){
+pool_size_(pool_size), disk_manager_(disk_manager),
+log_manager_(log_manager) {
   // Allocate and create individual BufferPoolManagerInstances
-   instances_.resize(num_instances_);
-   for (size_t i = 0; i < num_instances_; i ++) {
-     instances_[i] = new BufferPoolManagerInstance(pool_size_,num_instances_,i,disk_manager_,log_manager_);
-   } //利用了多态
-   next_instance_ = 0;
+  instances_.resize(num_instances_);
+  for (size_t i = 0; i < num_instances_; i ++) {
+    instances_[i] = new BufferPoolManagerInstance(pool_size_, num_instances_, i, disk_manager_, log_manager_);
+  }
+  next_instance_ = 0;
 }
 
 // Update constructor to destruct all BufferPoolManagerInstances and deallocate any associated memory
-ParallelBufferPoolManager::~ParallelBufferPoolManager(){
-  for (auto pool: instances_) {
+ParallelBufferPoolManager::~ParallelBufferPoolManager() {
+  for (auto pool : instances_) {
     delete pool;
   }
 }
@@ -43,7 +43,7 @@ size_t ParallelBufferPoolManager::GetPoolSize() {
 BufferPoolManager *ParallelBufferPoolManager::GetBufferPoolManager(page_id_t page_id) {
   // Get BufferPoolManager responsible for handling given page id. You can use this method in your other methods.
   auto ins_id = page_id % num_instances_;
-  LOG_DEBUG("get buffer manager %lu",ins_id);
+  LOG_DEBUG("get buffer manager %lu", ins_id);
   return instances_[ins_id];
 }
 
@@ -54,7 +54,7 @@ Page *ParallelBufferPoolManager::FetchPgImp(page_id_t page_id) {
 
 bool ParallelBufferPoolManager::UnpinPgImp(page_id_t page_id, bool is_dirty) {
   // Unpin page_id from responsible BufferPoolManagerInstance
-  return GetBufferPoolManager(page_id)->UnpinPage(page_id,is_dirty);
+  return GetBufferPoolManager(page_id)->UnpinPage(page_id, is_dirty);
 }
 
 bool ParallelBufferPoolManager::FlushPgImp(page_id_t page_id) {
@@ -69,17 +69,18 @@ Page *ParallelBufferPoolManager::NewPgImp(page_id_t *page_id) {
   // starting index and return nullptr
   // 2.   Bump the starting index (mod number of instances) to start search at a different BPMI each time this function
   // is called
+  std::lock_guard<std::mutex> guard(latch_);
   auto start = next_instance_;
   Page *page = nullptr;
   while (true) {
-    //LOG_DEBUG("the next_instance is %lu,the start is %lu",next_instance_,start);
+    // LOG_DEBUG("the next_instance is %lu,the start is %lu",next_instance_,start);
     page = instances_[next_instance_]->NewPage(page_id);
+    next_instance_ = (next_instance_ + 1) % num_instances_;
     if (page != nullptr) {
-      //LOG_DEBUG("find new page");
+      // LOG_DEBUG("find new page");
       break;
     }
-    next_instance_ = (next_instance_ + 1) % num_instances_;
-    //LOG_DEBUG("the next_instance is %lu,the start is %lu",next_instance_,start);
+    // LOG_DEBUG("the next_instance is %lu,the start is %lu",next_instance_,start);
     if (next_instance_ == start) {
       break;
     }
@@ -94,8 +95,8 @@ bool ParallelBufferPoolManager::DeletePgImp(page_id_t page_id) {
 
 void ParallelBufferPoolManager::FlushAllPgsImp() {
   // flush all pages from all BufferPoolManagerInstances
-  for (auto &instance: instances_) {
-    instance->FlushAllPages(); //内部有锁的保护
+  for (auto instance : instances_) {
+    instance->FlushAllPages();  // 内部有锁的保护
   }
 }
 
