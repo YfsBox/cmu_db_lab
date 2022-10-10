@@ -50,7 +50,7 @@ class LRUReplacer : public Replacer {
   // TODO(student): implement me!
   std::mutex latch_;
   std::list<frame_id_t> frames_;
-  std::unordered_map<frame_id_t, frameIt> itmap_;  // 如果不能控制严格的头进首出，就会导致迭代器无效
+  std::unordered_map<frame_id_t, frameIt> itmap_;
   const size_t capacity_;
 };
 

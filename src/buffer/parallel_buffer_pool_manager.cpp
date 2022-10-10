@@ -43,7 +43,7 @@ size_t ParallelBufferPoolManager::GetPoolSize() {
 BufferPoolManager *ParallelBufferPoolManager::GetBufferPoolManager(page_id_t page_id) {
   // Get BufferPoolManager responsible for handling given page id. You can use this method in your other methods.
   auto ins_id = page_id % num_instances_;
-  LOG_DEBUG("get buffer manager %lu", ins_id);
+  // LOG_DEBUG("get buffer manager %lu", ins_id);
   return instances_[ins_id];
 }
 
@@ -76,6 +76,7 @@ Page *ParallelBufferPoolManager::NewPgImp(page_id_t *page_id) {
     // LOG_DEBUG("the next_instance is %lu,the start is %lu",next_instance_,start);
     page = instances_[next_instance_]->NewPage(page_id);
     next_instance_ = (next_instance_ + 1) % num_instances_;
+    // LOG_DEBUG("next_ins %lu and start %lu", next_instance_, start);
     if (page != nullptr) {
       // LOG_DEBUG("find new page");
       break;
@@ -96,7 +97,7 @@ bool ParallelBufferPoolManager::DeletePgImp(page_id_t page_id) {
 void ParallelBufferPoolManager::FlushAllPgsImp() {
   // flush all pages from all BufferPoolManagerInstances
   for (auto instance : instances_) {
-    instance->FlushAllPages();  // 内部有锁的保护
+    instance->FlushAllPages();
   }
 }
 
