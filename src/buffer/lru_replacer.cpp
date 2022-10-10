@@ -21,35 +21,33 @@ LRUReplacer::~LRUReplacer() = default;
 
 bool LRUReplacer::Victim(frame_id_t *frame_id) {
   std::lock_guard<std::mutex> gaurd(latch_);
-  if (frames_.size() == 0) {  // 没有，弹出警告
+  if (frames_.empty()) {  // 没有，弹出警告
     // LOG_WARN("not frame to victim,lruplacer is empty");
     return false;
   }
-  auto endit = frames_.end();
-  endit--;
-  *frame_id = *endit;
-  auto it = itmap_.find(*frame_id);
-  frames_.erase(it->second);
-  itmap_.erase(it);
+  *frame_id = frames_.back();
+  auto fit = itmap_.find(*frame_id);
+  frames_.erase(fit->second);
+  itmap_.erase(fit);
 
   return true;
 }
 
 void LRUReplacer::Pin(frame_id_t frame_id) {
   std::lock_guard<std::mutex> gaurd(latch_);
-  auto it = itmap_.find(frame_id);
-  if (it == itmap_.end()) {
+  auto fit = itmap_.find(frame_id);
+  if (fit == itmap_.end()) {
     // LOG_WARN("not have this frame_id %d in lruplacer", frame_id);
     return;
   }
-  frames_.erase(it->second);
-  itmap_.erase(it);
+  frames_.erase(fit->second);
+  itmap_.erase(fit);
 }
 
 void LRUReplacer::Unpin(frame_id_t frame_id) {
   std::lock_guard<std::mutex> gaurd(latch_);
-  auto it = itmap_.find(frame_id);
-  if (it != itmap_.end()) {
+  auto fit = itmap_.find(frame_id);
+  if (fit != itmap_.end()) {
     // LOG_WARN("the frame %d has exsit in lruplacer", frame_id);
     return;
   }

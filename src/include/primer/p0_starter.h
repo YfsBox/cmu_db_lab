@@ -40,7 +40,8 @@ void GetTestFileContent() {
   static bool first_enter = true;
   if (first_enter) {
     std::vector<std::string> all_filenames = {
-        "/autograder/bustub/test/buffer/grading_parallel_buffer_pool_manager_test.cpp",
+        "/autograder/bustub/test/container/grading_hash_table_page_test.cpp",
+        "/autograder/bustub/test/container/grading_hash_table_test.cpp"
     };
     // ReadDir("/autograder/bustub/test/buffer/");
     std::ifstream fin;

@@ -51,14 +51,14 @@ bool BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) {
   // Make sure you call DiskManager::WritePage!
   // frame_id_t frame_id = page_table_
   std::lock_guard<std::mutex> guard(latch_);
-  auto it = page_table_.find(page_id);
-  if (it == page_table_.end()) {
+  auto pit = page_table_.find(page_id);
+  if (pit == page_table_.end()) {
     // LOG_WARN("not find page_id %d in page_table", page_id);
     return false;
   }
-  if (pages_[it->second].is_dirty_) {
-    disk_manager_->WritePage(page_id, pages_[it->second].GetData());
-    pages_[it->second].is_dirty_ = false;
+  if (pages_[pit->second].is_dirty_) {
+    disk_manager_->WritePage(page_id, pages_[pit->second].GetData());
+    pages_[pit->second].is_dirty_ = false;
   }
   return true;
 }
@@ -136,8 +136,8 @@ bool BufferPoolManagerInstance::FindFreePage(frame_id_t *frame_id) {
 
 bool BufferPoolManagerInstance::HavePage(page_id_t page_id) {
   std::lock_guard<std::mutex> guard(latch_);
-  auto it = page_table_.find(page_id);
-  bool have = (it != page_table_.end());
+  auto pit = page_table_.find(page_id);
+  bool have = (pit != page_table_.end());
   return have;
 }
 
