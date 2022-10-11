@@ -21,8 +21,7 @@ LRUReplacer::~LRUReplacer() = default;
 
 bool LRUReplacer::Victim(frame_id_t *frame_id) {
   std::lock_guard<std::mutex> gaurd(latch_);
-  if (frames_.empty()) {  // 没有，弹出警告
-    // LOG_WARN("not frame to victim,lruplacer is empty");
+  if (frames_.empty()) {
     return false;
   }
   *frame_id = frames_.back();
