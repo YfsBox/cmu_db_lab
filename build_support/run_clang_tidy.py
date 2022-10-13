@@ -29,7 +29,7 @@ Example invocations.
 Compilation database setup:
 http://clang.llvm.org/docs/HowToSetupToolingForLLVM.html
 """
-
+# -*- coding: utf-8 -*-
 from __future__ import division
 from __future__ import print_function
 
@@ -42,7 +42,9 @@ import pprint   # TERRIER: we want to print out formatted lists of files
 import re
 import shutil
 import subprocess
+
 import sys
+
 import tempfile
 import threading
 import traceback

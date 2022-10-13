@@ -14,6 +14,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <cmath>
 
 #include "common/exception.h"
 #include "common/logger.h"
@@ -46,22 +47,25 @@ uint32_t HASH_TABLE_TYPE::Hash(KeyType key) {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 inline uint32_t HASH_TABLE_TYPE::KeyToDirectoryIndex(KeyType key, HashTableDirectoryPage *dir_page) {
-  return 0;
+  uint32_t mask = dir_page->GetGlobalDepthMask();
+  uint32_t idx = Hash(key) & mask;
+  return idx;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 inline uint32_t HASH_TABLE_TYPE::KeyToPageId(KeyType key, HashTableDirectoryPage *dir_page) {
-  return 0;
+  uint32_t idx = KeyToDirectoryIndex(key,dir_page);
+  return dir_page->GetBucketPageId(idx);
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 HashTableDirectoryPage *HASH_TABLE_TYPE::FetchDirectoryPage() {
-  return nullptr;
+  return reinterpret_cast<HashTableDirectoryPage*>(buffer_pool_manager_->FetchPage(directory_page_id_));
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 HASH_TABLE_BUCKET_TYPE *HASH_TABLE_TYPE::FetchBucketPage(page_id_t bucket_page_id) {
-  return nullptr;
+  return reinterpret_cast<HASH_TABLE_BUCKET_TYPE*>(buffer_pool_manager_->FetchPage(bucket_page_id));
 }
 
 /*****************************************************************************
@@ -69,7 +73,11 @@ HASH_TABLE_BUCKET_TYPE *HASH_TABLE_TYPE::FetchBucketPage(page_id_t bucket_page_i
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std::vector<ValueType> *result) {
-  return false;
+  HashTableDirectoryPage *dir_page = FetchDirectoryPage();
+  auto page_id = KeyToPageId(key,dir_page);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
+
+  return bucket_page->GetValue(key,comparator_,result);
 }
 
 /*****************************************************************************
@@ -77,6 +85,17 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const ValueType &value) {
+  // 首先定位到应该插入的位置
+  HashTableDirectoryPage *dir_page = FetchDirectoryPage();
+  auto page_idx = KeyToDirectoryIndex(key,dir_page);
+  auto page_id = dir_page->GetBucketPageId(page_idx);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
+  // 判断容量是否足够
+  uint32_t bucket_size = static_cast<uint32_t>(pow(2,dir_page->GetLocalDepth(page_idx)));
+  if (bucket_page->NumReadable() < bucket_size) {  // 直接插入的情况
+    return bucket_page->Insert(key,value,comparator_);
+  }
+  // 下面的则是需要分裂的情况,除了分裂还有bucket上的调整是比较烦的
   return false;
 }
 

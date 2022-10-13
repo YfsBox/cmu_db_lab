@@ -51,17 +51,24 @@ bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vecto
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator cmp) {
   size_t len = sizeof(readable_) / sizeof(char);
-  bool result = false;
-  for (size_t i = 0; i < len * 8; i++) {
-    if (!IsReadable(i)) {
-      array_[i] = std::make_pair(key,value);
-      SetOccupied(i);
-      SetReadable(i);
-      result = true;
-      break;
+  bool is_exsit = false;
+  int empty_idx = -1;
+  for (size_t i = 0; i < len * 8; i++) {  // 这里越界了
+    if (!IsReadable(i) && empty_idx == -1) {
+      empty_idx = static_cast<int>(i);
+    } else if (cmp(key,array_[i].first) && value == array_[i].second) {
+      is_exsit = true;
     }
+    LOG_DEBUG("Insert loop %lu",i);
   }
-  return result;
+  if (is_exsit || empty_idx == -1) {
+    return false;
+  }
+  array_[empty_idx] = std::make_pair(key,value);
+  SetOccupied(empty_idx);
+  SetReadable(empty_idx);
+
+  return true;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>

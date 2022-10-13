@@ -1,7 +1,10 @@
 file(REMOVE_RECURSE
   "CMakeFiles/clock_replacer_test.dir/buffer/clock_replacer_test.cpp.o"
-  "clock_replacer_test"
+  "CMakeFiles/clock_replacer_test.dir/buffer/grading_buffer_pool_manager_instance_test.cpp.o"
+  "CMakeFiles/clock_replacer_test.dir/buffer/grading_lru_replacer_test.cpp.o"
+  "CMakeFiles/clock_replacer_test.dir/buffer/grading_parallel_buffer_pool_manager_test.cpp.o"
   "clock_replacer_test.pdb"
+  "clock_replacer_test"
 )
 
 # Per-language clean rules from dependency scanning.

@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM arm64v8/ubuntu:18.04
 CMD bash
 
 # Install Ubuntu packages.

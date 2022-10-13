@@ -17,7 +17,7 @@
 # under the License.
 #
 # Modified from the Apache Arrow project for the Terrier project.
-
+# -*- coding: utf-8 -*-
 import argparse
 import codecs
 import difflib

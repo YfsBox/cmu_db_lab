@@ -1,8 +1,8 @@
 file(REMOVE_RECURSE
-  "../../bin/libgmock_mainpdb_debug_postfix-NOTFOUND.pdb"
-  "../../lib/libgmock_main.so"
-  "../../lib/libgmock_main.so.1.12.1"
   "CMakeFiles/gmock_main.dir/src/gmock_main.cc.o"
+  "../../bin/libgmock_mainpdb_debug_postfix-NOTFOUND.pdb"
+  "../../lib/libgmock_main.so.1.12.1"
+  "../../lib/libgmock_main.so"
 )
 
 # Per-language clean rules from dependency scanning.

@@ -4,6 +4,9 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_CXX
+  "/tmp/tmp.IyJU8EsJ7j/test/buffer/grading_buffer_pool_manager_instance_test.cpp" "/tmp/tmp.IyJU8EsJ7j/cmake-build-debug-remote-host/test/CMakeFiles/lock_manager_test.dir/buffer/grading_buffer_pool_manager_instance_test.cpp.o"
+  "/tmp/tmp.IyJU8EsJ7j/test/buffer/grading_lru_replacer_test.cpp" "/tmp/tmp.IyJU8EsJ7j/cmake-build-debug-remote-host/test/CMakeFiles/lock_manager_test.dir/buffer/grading_lru_replacer_test.cpp.o"
+  "/tmp/tmp.IyJU8EsJ7j/test/buffer/grading_parallel_buffer_pool_manager_test.cpp" "/tmp/tmp.IyJU8EsJ7j/cmake-build-debug-remote-host/test/CMakeFiles/lock_manager_test.dir/buffer/grading_parallel_buffer_pool_manager_test.cpp.o"
   "/tmp/tmp.IyJU8EsJ7j/test/concurrency/lock_manager_test.cpp" "/tmp/tmp.IyJU8EsJ7j/cmake-build-debug-remote-host/test/CMakeFiles/lock_manager_test.dir/concurrency/lock_manager_test.cpp.o"
   )
 set(CMAKE_CXX_COMPILER_ID "GNU")

@@ -1,6 +1,4 @@
 file(REMOVE_RECURSE
-  "../lib/libbustub_shared.pdb"
-  "../lib/libbustub_shared.so"
   "CMakeFiles/bustub_shared.dir/buffer/buffer_pool_manager_instance.cpp.o"
   "CMakeFiles/bustub_shared.dir/buffer/clock_replacer.cpp.o"
   "CMakeFiles/bustub_shared.dir/buffer/lru_replacer.cpp.o"
@@ -58,6 +56,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/bustub_shared.dir/type/type.cpp.o"
   "CMakeFiles/bustub_shared.dir/type/value.cpp.o"
   "CMakeFiles/bustub_shared.dir/type/varlen_type.cpp.o"
+  "../lib/libbustub_shared.pdb"
+  "../lib/libbustub_shared.so"
 )
 
 # Per-language clean rules from dependency scanning.

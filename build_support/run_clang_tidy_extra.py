@@ -11,7 +11,7 @@ clang-tidy the return code becomes 1, making this a bigger problem.
 This helper addresses the problem by suppressing execution according to
 the configuration in this file.
 """
-
+# -*- coding: utf-8 -*-
 import re
 
 class CheckConfig(object):
