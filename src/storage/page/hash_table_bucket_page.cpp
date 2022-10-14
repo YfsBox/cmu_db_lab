@@ -39,8 +39,8 @@ size_t HASH_TABLE_BUCKET_TYPE::BitCount(char byte_char) const {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vector<ValueType> *result) {
-  size_t len = sizeof(array_) / sizeof(MappingType);
-  for (size_t i = 0; i < len; i++) {
+  size_t len = sizeof(readable_) / sizeof(char);
+  for (size_t i = 0; i < len * 8; i++) {
     if (!cmp(key,array_[i].first) && IsReadable(i)) {
       result->push_back(array_[i].second);
     }
@@ -53,13 +53,12 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
   size_t len = sizeof(readable_) / sizeof(char);
   bool is_exsit = false;
   int empty_idx = -1;
-  for (size_t i = 0; i < len * 8; i++) {  // 这里越界了
+  for (size_t i = 0; i < len * 8; i++) {
     if (!IsReadable(i) && empty_idx == -1) {
       empty_idx = static_cast<int>(i);
     } else if (cmp(key,array_[i].first) && value == array_[i].second) {
       is_exsit = true;
     }
-    LOG_DEBUG("Insert loop %lu",i);
   }
   if (is_exsit || empty_idx == -1) {
     return false;
@@ -176,6 +175,16 @@ void HASH_TABLE_BUCKET_TYPE::PrintBucket() {
   }
 
   LOG_INFO("Bucket Capacity: %lu, Size: %u, Taken: %u, Free: %u", BUCKET_ARRAY_SIZE, size, taken, free);
+}
+
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void HASH_TABLE_BUCKET_TYPE::ReHash(HashFunction<MappingType> *hashfunc, uint32_t local_depth, std::vector<MappingType> *result) {
+  size_t len = sizeof(readable_) / sizeof(char);
+  for (size_t i = 0; i < len * 8; i++) {
+    if (IsReadable(i)) {
+
+    }
+  }
 }
 
 // DO NOT REMOVE ANYTHING BELOW THIS LINE

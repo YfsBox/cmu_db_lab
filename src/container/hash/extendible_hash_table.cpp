@@ -28,6 +28,16 @@ HASH_TABLE_TYPE::ExtendibleHashTable(const std::string &name, BufferPoolManager 
                                      const KeyComparator &comparator, HashFunction<KeyType> hash_fn)
     : buffer_pool_manager_(buffer_pool_manager), comparator_(comparator), hash_fn_(std::move(hash_fn)) {
   //  implement me!
+  auto page = buffer_pool_manager_->NewPage(&directory_page_id_);
+  if (page != nullptr) {
+    HashTableDirectoryPage *dir_page = reinterpret_cast<HashTableDirectoryPage*>(page);
+    dir_page->SetPageId(directory_page_id_);
+    page_id_t bucket_id;
+    Page *bucket = buffer_pool_manager_->NewPage(&bucket_id);
+    if (bucket != nullptr) {
+      dir_page->SetBucketPageId(0, bucket_id);
+    }
+  }
 }
 
 /*****************************************************************************
@@ -95,12 +105,43 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   if (bucket_page->NumReadable() < bucket_size) {  // 直接插入的情况
     return bucket_page->Insert(key,value,comparator_);
   }
-  // 下面的则是需要分裂的情况,除了分裂还有bucket上的调整是比较烦的
-  return false;
+  if (dir_page->GetGlobalDepth() > dir_page->GetLocalDepth(page_idx)) {  // 直接进行扩容的情况
+    dir_page->IncrLocalDepth(page_idx);
+    return bucket_page->Insert(key,value,comparator_);
+  }
+  return SplitInsert(transaction,key,value);
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, const ValueType &value) {
+  // 需要拓展的情况应该区分local和global的关系
+  HashTableDirectoryPage *dir_page = FetchDirectoryPage();
+  auto page_idx = KeyToDirectoryIndex(key,dir_page);
+  auto page_id = dir_page->GetBucketPageId(page_idx);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
+
+  size_t old_gdepth = dir_page->GetGlobalDepth();
+  size_t new_len = static_cast<size_t> (pow(2,static_cast<double>(old_gdepth) + 1));
+  auto old_mask = dir_page->GetGlobalDepthMask();
+  for (size_t i = static_cast<size_t>(pow(2,static_cast<double>(old_gdepth))); i < new_len; i++) {
+    auto mask_i = old_mask & i;
+    auto local_depth = dir_page->GetLocalDepth(mask_i);
+    dir_page->SetLocalDepth(i,local_depth);
+    if (mask_i == page_idx) {
+      // 分配一个newpage
+      page_id_t new_page_id;
+      if (auto new_ok = buffer_pool_manager_->NewPage(&new_page_id);new_ok) {
+        dir_page->SetBucketPageId(i,new_page_id);
+        dir_page->IncrLocalDepth(page_idx);
+        dir_page->IncrLocalDepth(i);
+        // 还剩rehash和insert
+      }
+    } else {
+      page_id_t pg_id = dir_page->GetBucketPageId(mask_i);
+      dir_page->SetBucketPageId(i,pg_id);
+    }
+  }
+  dir_page->IncrGlobalDepth();
   return false;
 }
 
@@ -142,6 +183,8 @@ void HASH_TABLE_TYPE::VerifyIntegrity() {
   assert(buffer_pool_manager_->UnpinPage(directory_page_id_, false, nullptr));
   table_latch_.RUnlock();
 }
+// move bucket1 to bucket2
+
 
 /*****************************************************************************
  * TEMPLATE DEFINITIONS - DO NOT TOUCH
