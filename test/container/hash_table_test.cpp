@@ -66,7 +66,7 @@ TEST(HashTableTest, SampleTest) {
       }
     }
   }
-
+  printf("ok\n");
   ht.VerifyIntegrity();
 
   // look for a key that does not exist

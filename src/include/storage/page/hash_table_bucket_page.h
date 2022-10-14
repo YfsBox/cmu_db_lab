@@ -47,7 +47,7 @@ class HashTableBucketPage {
    * @return true if at least one key matched
    */
   bool GetValue(KeyType key, KeyComparator cmp, std::vector<ValueType> *result);
-
+  bool ExsitKv(KeyType key, KeyComparator cmp, ValueType value);
   /**
    * Attempts to insert a key and value in the bucket.  Uses the occupied_
    * and readable_ arrays to keep track of each slot's availability.
@@ -137,12 +137,12 @@ class HashTableBucketPage {
    * Prints the bucket's occupancy information
    */
   void PrintBucket();
+  void GetAllPairs(std::vector<MappingType> *result) const;
 
  private:
   //  For more on BUCKET_ARRAY_SIZE see storage/page/hash_table_page_defs.h
   uint32_t BucketIdx2BitIdx(uint32_t bucket_idx,char &bitidx) const;
   size_t BitCount(char byte_char) const;
-  void ReHash(HashFunction<MappingType> *hashfunc,uint32_t local_depth,std::vector<MappingType> *result);
 
   char occupied_[(BUCKET_ARRAY_SIZE - 1) / 8 + 1];
   // 0 if tombstone/brand new (never occupied), 1 otherwise.

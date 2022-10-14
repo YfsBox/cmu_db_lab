@@ -57,8 +57,9 @@ uint32_t HashTableDirectoryPage::GetMaskByLen(uint32_t len) const {
   if (len == 0) {
     return 0;
   }
-  uint32_t mask = 0x80000000;
+  int32_t mask = 0x80000000;
   mask >>= (32 - len - 1);
+  //LOG_DEBUG("the mask is 0x%x the ~mask is 0x%x",mask,~mask);
   return ~mask;
 }
 

@@ -59,6 +59,7 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 inline uint32_t HASH_TABLE_TYPE::KeyToDirectoryIndex(KeyType key, HashTableDirectoryPage *dir_page) {
   uint32_t mask = dir_page->GetGlobalDepthMask();
   uint32_t idx = Hash(key) & mask;
+  LOG_DEBUG("mask is 0x%x and idx is 0x%x",mask,idx);
   return idx;
 }
 
@@ -86,7 +87,7 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   auto page_id = KeyToPageId(key,dir_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
-
+  //bucket_page->PrintBucket();
   return bucket_page->GetValue(key,comparator_,result);
 }
 
@@ -96,7 +97,9 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const ValueType &value) {
   // 首先定位到应该插入的位置
+  LOG_DEBUG("the insert key hash is 0x%x", Hash(key));
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
+  dir_page->PrintDirectory();
   auto page_idx = KeyToDirectoryIndex(key,dir_page);
   auto page_id = dir_page->GetBucketPageId(page_idx);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
@@ -106,7 +109,12 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
     return bucket_page->Insert(key,value,comparator_);
   }
   if (dir_page->GetGlobalDepth() > dir_page->GetLocalDepth(page_idx)) {  // 直接进行扩容的情况
-    dir_page->IncrLocalDepth(page_idx);
+    //dir_page->IncrLocalDepth(page_idx);
+    for (size_t i = 0; i < dir_page->Size(); i++) {
+      if (dir_page->GetBucketPageId(i) == page_id) {
+        dir_page->IncrLocalDepth(i);
+      }
+    }
     return bucket_page->Insert(key,value,comparator_);
   }
   return SplitInsert(transaction,key,value);
@@ -114,35 +122,50 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  // 需要拓展的情况应该区分local和global的关系
+  // 获取bucket_page和dir_page
+  bool result;
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   auto page_idx = KeyToDirectoryIndex(key,dir_page);
   auto page_id = dir_page->GetBucketPageId(page_idx);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
-
+  // 获取旧的gdepth和新的size
   size_t old_gdepth = dir_page->GetGlobalDepth();
   size_t new_len = static_cast<size_t> (pow(2,static_cast<double>(old_gdepth) + 1));
   auto old_mask = dir_page->GetGlobalDepthMask();
+  //如果已经有这个kv了
+  if (bucket_page->ExsitKv(key,comparator_,value)) {
+    return false;
+  }
+  dir_page->IncrGlobalDepth();
+  auto new_mask = dir_page->GetGlobalDepthMask();
   for (size_t i = static_cast<size_t>(pow(2,static_cast<double>(old_gdepth))); i < new_len; i++) {
-    auto mask_i = old_mask & i;
+    auto mask_i = old_mask & i;  // 取旧depth的位数
     auto local_depth = dir_page->GetLocalDepth(mask_i);
-    dir_page->SetLocalDepth(i,local_depth);
+    dir_page->SetLocalDepth(i,local_depth);  // 设置localdepth
     if (mask_i == page_idx) {
       // 分配一个newpage
       page_id_t new_page_id;
       if (auto new_ok = buffer_pool_manager_->NewPage(&new_page_id);new_ok) {
+        auto new_page = FetchBucketPage(new_page_id);
         dir_page->SetBucketPageId(i,new_page_id);
         dir_page->IncrLocalDepth(page_idx);
         dir_page->IncrLocalDepth(i);
         // 还剩rehash和insert
+        ReHash(page_idx,bucket_page,new_page,new_mask);
+        if ((Hash(key) & new_mask) == page_idx) {
+          result = bucket_page->Insert(key,value,comparator_);
+        } else {
+          result = new_page->Insert(key,value,comparator_);
+        }
+      } else {
+        return false;
       }
     } else {
       page_id_t pg_id = dir_page->GetBucketPageId(mask_i);
       dir_page->SetBucketPageId(i,pg_id);
     }
   }
-  dir_page->IncrGlobalDepth();
-  return false;
+  return result;
 }
 
 /*****************************************************************************
@@ -184,6 +207,19 @@ void HASH_TABLE_TYPE::VerifyIntegrity() {
   table_latch_.RUnlock();
 }
 // move bucket1 to bucket2
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void HASH_TABLE_TYPE::ReHash(uint32_t idx,HASH_TABLE_BUCKET_TYPE *bucket1, HASH_TABLE_BUCKET_TYPE *bucket2,uint32_t mask) {
+  std::vector<MappingType> pairs;
+  bucket1->GetAllPairs(&pairs);
+
+  for (auto pair : pairs) {
+    auto hash = Hash(pair.first);
+    if ((hash & mask) != idx) {
+     bucket1->Remove(pair.first,pair.second,comparator_);
+     bucket2->Insert(pair.first,pair.second,comparator_);
+    }
+  }
+}
 
 
 /*****************************************************************************
@@ -198,3 +234,6 @@ template class ExtendibleHashTable<GenericKey<32>, RID, GenericComparator<32>>;
 template class ExtendibleHashTable<GenericKey<64>, RID, GenericComparator<64>>;
 
 }  // namespace bustub
+
+// (1) (0,0) 1100 -> bucket 1
+// (2) ()

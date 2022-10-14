@@ -49,6 +49,19 @@ bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vecto
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
+bool HASH_TABLE_BUCKET_TYPE::ExsitKv(KeyType key, KeyComparator cmp, ValueType value) {
+  std::vector<ValueType> values;
+  if (GetValue(key,cmp,&values)) {
+    for (auto val : values) {
+      if (val == value) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator cmp) {
   size_t len = sizeof(readable_) / sizeof(char);
   bool is_exsit = false;
@@ -56,7 +69,9 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
   for (size_t i = 0; i < len * 8; i++) {
     if (!IsReadable(i) && empty_idx == -1) {
       empty_idx = static_cast<int>(i);
-    } else if (cmp(key,array_[i].first) && value == array_[i].second) {
+    }
+    if (IsReadable(i) && cmp(key,array_[i].first) == 0 && value == array_[i].second) {
+      //std::cout << "array kv is " << array_[i].first << " " << array_[i].second <<'\n';
       is_exsit = true;
     }
   }
@@ -178,14 +193,15 @@ void HASH_TABLE_BUCKET_TYPE::PrintBucket() {
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
-void HASH_TABLE_BUCKET_TYPE::ReHash(HashFunction<MappingType> *hashfunc, uint32_t local_depth, std::vector<MappingType> *result) {
+void HASH_TABLE_BUCKET_TYPE::GetAllPairs(std::vector<std::pair<KeyType, ValueType>> *result) const {
   size_t len = sizeof(readable_) / sizeof(char);
   for (size_t i = 0; i < len * 8; i++) {
     if (IsReadable(i)) {
-
+      result->push_back(array_[i]);
     }
   }
 }
+
 
 // DO NOT REMOVE ANYTHING BELOW THIS LINE
 template class HashTableBucketPage<int, int, IntComparator>;

@@ -160,6 +160,7 @@ class ExtendibleHashTable {
    * @param value the value that was removed
    */
   void Merge(Transaction *transaction, const KeyType &key, const ValueType &value);
+  void ReHash(uint32_t idx,HASH_TABLE_BUCKET_TYPE *bucket1,HASH_TABLE_BUCKET_TYPE *bucket2,uint32_t mask);
 
   // member variables
   page_id_t directory_page_id_;
