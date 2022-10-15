@@ -185,6 +185,7 @@ class HashTableDirectoryPage {
    * Prints the current directory
    */
   void PrintDirectory();
+  uint32_t Expand(page_id_t page_id);
 
  private:
   uint32_t GetMaskByLen(uint32_t len) const;

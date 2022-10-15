@@ -6,7 +6,10 @@
 -- Generating done
 -- Build files have been written to: /tmp/tmp.IyJU8EsJ7j/cmake-build-debug-remote-host/googletest-download
 [ 11%] Performing update step for 'googletest'
-Current branch main is up to date.
+From https://github.com/google/googletest
+   9fbb6575..a9b2f049  main       -> origin/main
+First, rewinding head to replay your work on top of it...
+Fast-forwarded main to origin/main.
 [ 22%] No configure step for 'googletest'
 [ 33%] No build step for 'googletest'
 [ 44%] No install step for 'googletest'

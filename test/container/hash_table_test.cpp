@@ -66,13 +66,14 @@ TEST(HashTableTest, SampleTest) {
       }
     }
   }
-  printf("ok\n");
   ht.VerifyIntegrity();
 
   // look for a key that does not exist
   std::vector<int> tmp_res;
   ht.GetValue(nullptr, 20, &tmp_res);
   EXPECT_EQ(0, tmp_res.size());
+
+  printf("Insert ok\n");
 
   // delete some values
   for (int i = 0; i < 5; i++) {

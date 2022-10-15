@@ -53,6 +53,10 @@ void HashTableDirectoryPage::DecrLocalDepth(uint32_t bucket_idx) { local_depths_
 
 uint32_t HashTableDirectoryPage::GetLocalHighBit(uint32_t bucket_idx) { return 0; }
 
+uint32_t HashTableDirectoryPage::GetLocalDepthMask(uint32_t bucket_idx) {
+    return GetMaskByLen(GetLocalDepth(bucket_idx));
+}
+
 uint32_t HashTableDirectoryPage::GetMaskByLen(uint32_t len) const {
   if (len == 0) {
     return 0;
@@ -114,6 +118,29 @@ void HashTableDirectoryPage::VerifyIntegrity() {
     it++;
   }
 }
+
+uint32_t HashTableDirectoryPage::Expand(page_id_t page_id) {
+  size_t old_gdepth = global_depth_;
+  uint32_t need_split = -1;
+  auto new_len = static_cast<uint32_t> (pow(2,static_cast<double>(old_gdepth) + 1));
+  auto old_mask = GetGlobalDepthMask();
+
+  IncrGlobalDepth();
+  //auto new_mask = GetGlobalDepthMask();
+  for (uint32_t i = static_cast<uint32_t>(pow(2,static_cast<double>(old_gdepth))); i < new_len; i++) {
+    auto mask_i = old_mask & i;  // 取旧depth的位数
+    auto local_depth = GetLocalDepth(mask_i);
+    SetLocalDepth(i,local_depth);
+
+    if (mask_i == static_cast<size_t>(page_id)) {
+     need_split = i;
+    }
+    page_id_t pg_id = GetBucketPageId(mask_i);
+    SetBucketPageId(i,pg_id);
+  }
+  return need_split;
+}
+
 
 void HashTableDirectoryPage::PrintDirectory() {
   LOG_DEBUG("======== DIRECTORY (global_depth_: %u) ========", global_depth_);
