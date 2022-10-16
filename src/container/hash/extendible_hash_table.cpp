@@ -89,7 +89,7 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   auto page_id = KeyToPageId(key,dir_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
-  dir_page->PrintDirectory();
+  // dir_page->PrintDirectory();
   LOG_DEBUG("GetValue in %d",page_id);
   bool res = bucket_page->GetValue(key,comparator_,result);
   buffer_pool_manager_->UnpinPage(page_id, false);
@@ -105,7 +105,7 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   // 首先定位到应该插入的位置
   LOG_DEBUG("the insert key hash is 0x%x", Hash(key));
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
-  dir_page->PrintDirectory();
+  // dir_page->PrintDirectory();
   bool result = false;
   auto page_idx = KeyToDirectoryIndex(key,dir_page);
   auto page_id = dir_page->GetBucketPageId(page_idx);
@@ -200,7 +200,7 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
   auto page_idx = KeyToDirectoryIndex(key,dir_page);
   auto page_id = dir_page->GetBucketPageId(page_idx);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
-  dir_page->PrintDirectory();
+  // dir_page->PrintDirectory();
 
   result = bucket_page->Remove(key,value,comparator_);
   if (bucket_page->NumReadable() > 0) {
@@ -240,7 +240,6 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     auto bucket_page_id = dir_page->GetBucketPageId(i);
     if (bucket_page_id != page_id) {
       brother_page_id = bucket_page_id;
-      //bro_local_depth = dir_page->GetLocalDepth(i);
       break;
     }
   }
@@ -251,15 +250,19 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     if (page_idx == i || (new_mask & i) != new_page_idx) {  // 确实是兄弟节点
       continue;
     }
-    dir_page->DecrLocalDepth(i);
     if (dir_page->GetBucketPageId(i) == page_id) {
       dir_page->SetBucketPageId(i,brother_page_id);
+      dir_page->DecrLocalDepth(i);
+    } else {
+      dir_page->SetLocalDepth(i,dir_page->GetLocalDepth(page_idx));
     }
   }
 
   if (dir_page->CanShrink()) {
+    LOG_DEBUG("dir_gage decr");
     dir_page->DecrGlobalDepth();
   }
+  buffer_pool_manager_->UnpinPage(page_id, true);
   buffer_pool_manager_->DeletePage(page_id);
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
 }
