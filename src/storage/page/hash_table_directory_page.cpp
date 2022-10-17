@@ -17,6 +17,19 @@
 #include "common/logger.h"
 
 namespace bustub {
+
+static uint32_t getupbitmask(uint32_t n) {
+  if (n == 0) {
+    return 0;
+  }
+  uint32_t mask = 0x1;
+  return mask << (n - 1);
+}
+
+static uint32_t upbit(uint32_t str,uint32_t n) {
+  return str ^ getupbitmask(n);  // 将某一位翻转过来
+}
+
 page_id_t HashTableDirectoryPage::GetPageId() const { return page_id_; }
 
 void HashTableDirectoryPage::SetPageId(bustub::page_id_t page_id) { page_id_ = page_id; }
@@ -157,6 +170,12 @@ uint32_t HashTableDirectoryPage::Expand(page_id_t page_id) {
   return need_split;
 }
 
+uint32_t HashTableDirectoryPage::GetBrother(uint32_t bucket_idx) const {
+  if (local_depths_[bucket_idx] == 0) {
+    return 0;
+  }
+  return upbit(bucket_idx,local_depths_[bucket_idx]);
+}
 
 void HashTableDirectoryPage::PrintDirectory() {
   LOG_DEBUG("======== DIRECTORY (global_depth_: %u) ========", global_depth_);

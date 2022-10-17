@@ -186,6 +186,7 @@ class HashTableDirectoryPage {
    */
   void PrintDirectory();
   uint32_t Expand(page_id_t page_id);
+  uint32_t GetBrother(uint32_t bucket_idx) const;
 
  private:
   uint32_t GetMaskByLen(uint32_t len) const;
