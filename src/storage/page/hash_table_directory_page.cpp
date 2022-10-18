@@ -26,9 +26,7 @@ static uint32_t GetUpbitmask(uint32_t n) {
   return mask << (n - 1);
 }
 
-static uint32_t Upbit(uint32_t str, uint32_t n) {
-  return str ^ GetUpbitmask(n);
-}
+static uint32_t Upbit(uint32_t str, uint32_t n) { return str ^ GetUpbitmask(n); }
 
 page_id_t HashTableDirectoryPage::GetPageId() const { return page_id_; }
 
@@ -40,9 +38,7 @@ void HashTableDirectoryPage::SetLSN(lsn_t lsn) { lsn_ = lsn; }
 
 uint32_t HashTableDirectoryPage::GetGlobalDepth() { return global_depth_; }
 
-uint32_t HashTableDirectoryPage::GetGlobalDepthMask() {
-  return GetMaskByLen(global_depth_);
-}
+uint32_t HashTableDirectoryPage::GetGlobalDepthMask() { return GetMaskByLen(global_depth_); }
 
 void HashTableDirectoryPage::IncrGlobalDepth() { global_depth_++; }
 
@@ -87,17 +83,10 @@ void HashTableDirectoryPage::DecrLocalDepth(uint32_t bucket_idx) {
 uint32_t HashTableDirectoryPage::GetLocalHighBit(uint32_t bucket_idx) { return 0; }
 
 uint32_t HashTableDirectoryPage::GetLocalDepthMask(uint32_t bucket_idx) {
-    return GetMaskByLen(GetLocalDepth(bucket_idx));
+  return GetMaskByLen(GetLocalDepth(bucket_idx));
 }
 
-char HashTableDirectoryPage::GetMaskByLen(uint32_t len) const {
-  if (len == 0) {
-    return 0;
-  }
-  int32_t mask = static_cast<int32_t>(0x80000000);
-  mask >>= static_cast<int32_t>(32 - len - 1);
-  return ~mask;
-}
+uint32_t HashTableDirectoryPage::GetMaskByLen(uint32_t len) const { return ((1 << len) - 1); }
 
 /**
  * VerifyIntegrity - Use this for debugging but **DO NOT CHANGE**
@@ -164,7 +153,7 @@ uint32_t HashTableDirectoryPage::Expand(page_id_t page_id) {
     SetLocalDepth(i, local_depth);
 
     if (mask_i == static_cast<size_t>(page_id)) {
-     need_split = i;
+      need_split = i;
     }
     page_id_t pg_id = GetBucketPageId(mask_i);
     SetBucketPageId(i, pg_id);

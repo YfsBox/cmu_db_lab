@@ -189,7 +189,7 @@ class HashTableDirectoryPage {
   uint32_t GetBrother(uint32_t bucket_idx) const;
 
  private:
-  char GetMaskByLen(uint32_t len) const;
+  uint32_t GetMaskByLen(uint32_t len) const;
 
   page_id_t page_id_;
   lsn_t lsn_;
