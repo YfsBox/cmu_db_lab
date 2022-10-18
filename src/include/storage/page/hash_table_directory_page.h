@@ -189,13 +189,13 @@ class HashTableDirectoryPage {
   uint32_t GetBrother(uint32_t bucket_idx) const;
 
  private:
-  uint32_t GetMaskByLen(uint32_t len) const;
+  char GetMaskByLen(uint32_t len) const;
 
   page_id_t page_id_;
   lsn_t lsn_;
   uint32_t global_depth_{0};
-  uint8_t local_depths_[DIRECTORY_ARRAY_SIZE];  // 对于每个bucket的path depth
-  page_id_t bucket_page_ids_[DIRECTORY_ARRAY_SIZE];  // 指向一个个bucket
+  uint8_t local_depths_[DIRECTORY_ARRAY_SIZE];
+  page_id_t bucket_page_ids_[DIRECTORY_ARRAY_SIZE];
 };
 
 }  // namespace bustub

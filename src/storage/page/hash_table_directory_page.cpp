@@ -18,7 +18,7 @@
 
 namespace bustub {
 
-static uint32_t getupbitmask(uint32_t n) {
+static uint32_t GetUpbitmask(uint32_t n) {
   if (n == 0) {
     return 0;
   }
@@ -26,8 +26,8 @@ static uint32_t getupbitmask(uint32_t n) {
   return mask << (n - 1);
 }
 
-static uint32_t upbit(uint32_t str,uint32_t n) {
-  return str ^ getupbitmask(n);  // 将某一位翻转过来
+static uint32_t Upbit(uint32_t str, uint32_t n) {
+  return str ^ GetUpbitmask(n);
 }
 
 page_id_t HashTableDirectoryPage::GetPageId() const { return page_id_; }
@@ -50,9 +50,11 @@ void HashTableDirectoryPage::DecrGlobalDepth() { global_depth_--; }
 
 page_id_t HashTableDirectoryPage::GetBucketPageId(uint32_t bucket_idx) { return bucket_page_ids_[bucket_idx]; }
 
-void HashTableDirectoryPage::SetBucketPageId(uint32_t bucket_idx, page_id_t bucket_page_id) { bucket_page_ids_[bucket_idx] = bucket_page_id; }
+void HashTableDirectoryPage::SetBucketPageId(uint32_t bucket_idx, page_id_t bucket_page_id) {
+  bucket_page_ids_[bucket_idx] = bucket_page_id;
+}
 
-uint32_t HashTableDirectoryPage::Size() { return static_cast<uint32_t>(pow(2,global_depth_)); }
+uint32_t HashTableDirectoryPage::Size() { return 1 << global_depth_; }
 
 bool HashTableDirectoryPage::CanShrink() {
   if (global_depth_ == 0) {
@@ -69,7 +71,9 @@ bool HashTableDirectoryPage::CanShrink() {
 
 uint32_t HashTableDirectoryPage::GetLocalDepth(uint32_t bucket_idx) { return local_depths_[bucket_idx]; }
 
-void HashTableDirectoryPage::SetLocalDepth(uint32_t bucket_idx, uint8_t local_depth) { local_depths_[bucket_idx] = local_depth; }
+void HashTableDirectoryPage::SetLocalDepth(uint32_t bucket_idx, uint8_t local_depth) {
+  local_depths_[bucket_idx] = local_depth;
+}
 
 void HashTableDirectoryPage::IncrLocalDepth(uint32_t bucket_idx) { local_depths_[bucket_idx]++; }
 
@@ -86,13 +90,12 @@ uint32_t HashTableDirectoryPage::GetLocalDepthMask(uint32_t bucket_idx) {
     return GetMaskByLen(GetLocalDepth(bucket_idx));
 }
 
-uint32_t HashTableDirectoryPage::GetMaskByLen(uint32_t len) const {
+char HashTableDirectoryPage::GetMaskByLen(uint32_t len) const {
   if (len == 0) {
     return 0;
   }
-  int32_t mask = 0x80000000;
-  mask >>= (32 - len - 1);
-  //LOG_DEBUG("the mask is 0x%x the ~mask is 0x%x",mask,~mask);
+  int32_t mask = static_cast<int32_t>(0x80000000);
+  mask >>= static_cast<int32_t>(32 - len - 1);
   return ~mask;
 }
 
@@ -130,11 +133,11 @@ void HashTableDirectoryPage::VerifyIntegrity() {
     }
   }
 
-  auto it = page_id_to_count.begin();
+  auto pit = page_id_to_count.begin();
 
-  while (it != page_id_to_count.end()) {
-    page_id_t curr_page_id = it->first;
-    uint32_t curr_count = it->second;
+  while (pit != page_id_to_count.end()) {
+    page_id_t curr_page_id = pit->first;
+    uint32_t curr_count = pit->second;
     uint32_t curr_ld = page_id_to_ld[curr_page_id];
     uint32_t required_count = 0x1 << (global_depth_ - curr_ld);
 
@@ -144,28 +147,27 @@ void HashTableDirectoryPage::VerifyIntegrity() {
       PrintDirectory();
       assert(curr_count == required_count);
     }
-    it++;
+    pit++;
   }
 }
 
 uint32_t HashTableDirectoryPage::Expand(page_id_t page_id) {
   size_t old_gdepth = global_depth_;
   uint32_t need_split = -1;
-  auto new_len = static_cast<uint32_t> (pow(2,static_cast<double>(old_gdepth) + 1));
+  auto new_len = static_cast<uint32_t>(pow(2, static_cast<double>(old_gdepth) + 1));
   auto old_mask = GetGlobalDepthMask();
 
   IncrGlobalDepth();
-  //auto new_mask = GetGlobalDepthMask();
-  for (uint32_t i = static_cast<uint32_t>(pow(2,static_cast<double>(old_gdepth))); i < new_len; i++) {
-    auto mask_i = old_mask & i;  // 取旧depth的位数
+  for (uint32_t i = static_cast<uint32_t>(pow(2, static_cast<double>(old_gdepth))); i < new_len; i++) {
+    auto mask_i = old_mask & i;
     auto local_depth = GetLocalDepth(mask_i);
-    SetLocalDepth(i,local_depth);
+    SetLocalDepth(i, local_depth);
 
     if (mask_i == static_cast<size_t>(page_id)) {
      need_split = i;
     }
     page_id_t pg_id = GetBucketPageId(mask_i);
-    SetBucketPageId(i,pg_id);
+    SetBucketPageId(i, pg_id);
   }
   return need_split;
 }
@@ -174,7 +176,7 @@ uint32_t HashTableDirectoryPage::GetBrother(uint32_t bucket_idx) const {
   if (local_depths_[bucket_idx] == 0) {
     return 0;
   }
-  return upbit(bucket_idx,local_depths_[bucket_idx]);
+  return Upbit(bucket_idx, local_depths_[bucket_idx]);
 }
 
 void HashTableDirectoryPage::PrintDirectory() {
