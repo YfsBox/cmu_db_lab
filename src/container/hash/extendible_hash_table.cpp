@@ -87,11 +87,16 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std::vector<ValueType> *result) {
   table_latch_.RLock();
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
-  auto page_id = KeyToPageId(key, dir_page);
+
+  auto page_idx = KeyToDirectoryIndex(key, dir_page);
+  auto page_id = dir_page->GetBucketPageId(page_idx);
+
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
   Page *page = reinterpret_cast<Page*> (bucket_page);
   page->RLatch();
   bool res = bucket_page->GetValue(key, comparator_, result);
+  // std::cout << "GetValue " << key <<" at page " << page_id << " the idx is " << page_idx;
+  // printf(",the hash is 0x%x the global is %d\n", Hash(key),dir_page->GetGlobalDepth());
   page->RUnlatch();
   buffer_pool_manager_->UnpinPage(page_id, false);
   buffer_pool_manager_->UnpinPage(directory_page_id_, false);
@@ -109,12 +114,10 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   bool result = false;
   auto page_idx = KeyToDirectoryIndex(key, dir_page);
   auto page_id = dir_page->GetBucketPageId(page_idx);
-
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
   Page *page = reinterpret_cast<Page*> (bucket_page);
   page->WLatch();
   if (bucket_page->ExsitKv(key, comparator_, value)) {
-    // std::cout << "The Kv Exist in bucket page " << page_id << ",the kv is (" << key << "," << value << ")\n";
     page->WUnlatch();
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
     buffer_pool_manager_->UnpinPage(page_id, false);
@@ -141,11 +144,11 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, const ValueType &value) {
   table_latch_.WLock();
-  bool result = false;
   int need_split = -1;
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   auto page_idx = KeyToDirectoryIndex(key, dir_page);
   if (dir_page->GetGlobalDepth() == dir_page->GetLocalDepth(page_idx)) {
+    // LOG_DEBUG("has Expand because %d",page_idx);
     need_split = dir_page->Expand(page_idx);
   }
   auto page_id = dir_page->GetBucketPageId(page_idx);
@@ -173,6 +176,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
         auto old_page_idx = old_mask & page_idx;
         auto new_page_idx = new_mask & page_idx;
         if ((old_mask & i) == old_page_idx && (new_mask & i) != new_page_idx) {
+          // LOG_DEBUG("Set the page_idx %lu to new_page_id %d",i,new_page_id);
           dir_page->SetBucketPageId(i, new_page_id);
         }
       }
@@ -181,12 +185,6 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
       dir_page->IncrLocalDepth(need_split);
     }
     ReHash(page_idx, bucket_page, new_bucket, new_mask);
-
-    if ((Hash(key) & new_mask) == (page_idx & new_mask)) {
-      result = bucket_page->Insert(key, value, comparator_);
-    } else {
-      result = new_bucket->Insert(key, value, comparator_);
-    }
     new_page->WUnlatch();
     buffer_pool_manager_->UnpinPage(new_page_id, true);
   }
@@ -194,7 +192,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   buffer_pool_manager_->UnpinPage(page_id, true);
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   table_latch_.WUnlock();
-  return result;
+  return Insert(transaction, key, value);
 }
 
 /*****************************************************************************
@@ -270,7 +268,6 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
   if (dir_page->CanShrink()) {
     dir_page->DecrGlobalDepth();
   }
-
   buffer_pool_manager_->UnpinPage(page_id, true);
   buffer_pool_manager_->UnpinPage(bro_page_id, true);
   buffer_pool_manager_->DeletePage(page_id);
@@ -311,9 +308,10 @@ void HASH_TABLE_TYPE::ReHash(uint32_t idx, HASH_TABLE_BUCKET_TYPE *bucket1, HASH
 
   for (auto pair : pairs) {
     auto hash = Hash(pair.first);
-    if ((hash & mask) != idx) {
+    if ((hash & mask) != (idx & mask)) {
      bucket1->Remove(pair.first, pair.second, comparator_);
      bucket2->Insert(pair.first, pair.second, comparator_);
+    // std::cout << "mask is " << mask <<" Rehash " << pair.first << "," << pair.second <<'\n';
     }
   }
 }
