@@ -95,8 +95,6 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
   Page *page = reinterpret_cast<Page *>(bucket_page);
   page->RLatch();
   bool res = bucket_page->GetValue(key, comparator_, result);
-  // std::cout << "GetValue " << key <<" at page " << page_id << " the idx is " << page_idx;
-  // printf(",the hash is 0x%x the global is %d\n", Hash(key),dir_page->GetGlobalDepth());
   page->RUnlatch();
   buffer_pool_manager_->UnpinPage(page_id, false);
   buffer_pool_manager_->UnpinPage(directory_page_id_, false);
@@ -147,6 +145,11 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   int need_split = -1;
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   auto page_idx = KeyToDirectoryIndex(key, dir_page);
+  if (dir_page->GetLocalDepth(page_idx) >= 9) {
+    buffer_pool_manager_->UnpinPage(directory_page_id_, false);
+    table_latch_.WUnlock();
+    return false;
+  }
   if (dir_page->GetGlobalDepth() == dir_page->GetLocalDepth(page_idx)) {
     need_split = dir_page->Expand(page_idx);
   }
@@ -158,35 +161,34 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   uint32_t new_mask;
   uint32_t old_mask;
   auto new_page = buffer_pool_manager_->NewPage(&new_page_id);
-  if (new_page != nullptr) {
-    new_page->WLatch();
-    HASH_TABLE_BUCKET_TYPE *new_bucket = reinterpret_cast<HASH_TABLE_BUCKET_TYPE *>(new_page);
-    old_mask = dir_page->GetLocalDepthMask(page_idx);
-    dir_page->IncrLocalDepth(page_idx);
-    new_mask = dir_page->GetLocalDepthMask(page_idx);
+  assert(new_page != nullptr);
+  new_page->WLatch();
+  HASH_TABLE_BUCKET_TYPE *new_bucket = reinterpret_cast<HASH_TABLE_BUCKET_TYPE *>(new_page);
+  old_mask = dir_page->GetLocalDepthMask(page_idx);
+  dir_page->IncrLocalDepth(page_idx);
+  new_mask = dir_page->GetLocalDepthMask(page_idx);
 
-    if (need_split == -1) {
-      for (size_t i = 0; i < dir_page->Size(); i++) {
-        if (i == page_idx || page_id != dir_page->GetBucketPageId(i)) {
-          continue;
-        }
-        dir_page->IncrLocalDepth(i);
-        // LOG_DEBUG("old hash is 0x%lx,new hash is 0x%lx,the page_idx is 0x%x",old_mask & i,new_mask & i,page_idx);
-        auto old_page_idx = old_mask & page_idx;
-        auto new_page_idx = new_mask & page_idx;
-        if ((old_mask & i) == old_page_idx && (new_mask & i) != new_page_idx) {
-          // LOG_DEBUG("Set the page_idx %lu to new_page_id %d",i,new_page_id);
-          dir_page->SetBucketPageId(i, new_page_id);
-        }
+  if (need_split == -1) {
+    for (size_t i = 0; i < dir_page->Size(); i++) {
+      if (i == page_idx || page_id != dir_page->GetBucketPageId(i)) {
+        continue;
       }
-    } else {
-      dir_page->SetBucketPageId(need_split, new_page_id);
-      dir_page->IncrLocalDepth(need_split);
+      dir_page->IncrLocalDepth(i);
+      // LOG_DEBUG("old hash is 0x%lx,new hash is 0x%lx,the page_idx is 0x%x",old_mask & i,new_mask & i,page_idx);
+      auto old_page_idx = old_mask & page_idx;
+      auto new_page_idx = new_mask & page_idx;
+      if ((old_mask & i) == old_page_idx && (new_mask & i) != new_page_idx) {
+        // LOG_DEBUG("Set the page_idx %lu to new_page_id %d",i,new_page_id);
+        dir_page->SetBucketPageId(i, new_page_id);
+      }
     }
-    ReHash(page_idx, bucket_page, new_bucket, new_mask);
-    new_page->WUnlatch();
-    buffer_pool_manager_->UnpinPage(new_page_id, true);
+  } else {
+    dir_page->SetBucketPageId(need_split, new_page_id);
+    dir_page->IncrLocalDepth(need_split);
   }
+  ReHash(page_idx, bucket_page, new_bucket, new_mask);
+  new_page->WUnlatch();
+  buffer_pool_manager_->UnpinPage(new_page_id, true);
   page_bucket->WUnlatch();
   buffer_pool_manager_->UnpinPage(page_id, true);
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
@@ -210,7 +212,6 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
   page_bucket->WLatch();
   result = bucket_page->Remove(key, value, comparator_);
   if (!bucket_page->IsEmpty()) {
-    // LOG_DEBUG("Insert into page %d", page_id);
     page_bucket->WUnlatch();
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
     buffer_pool_manager_->UnpinPage(page_id, true);
@@ -218,7 +219,7 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
   } else {
     page_bucket->WUnlatch();
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
-    buffer_pool_manager_->UnpinPage(page_id, false);
+    buffer_pool_manager_->UnpinPage(page_id, true);
     // LOG_DEBUG("Merge pages because %d",page_id);
     table_latch_.RUnlock();
     Merge(transaction, key, value);
@@ -275,7 +276,7 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     dir_page->SetBucketPageId(i, bro_page_id);
     dir_page->SetLocalDepth(i, local_depth);
   }
-  if (dir_page->CanShrink()) {
+  while (dir_page->CanShrink()) {
     dir_page->DecrGlobalDepth();
   }
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
