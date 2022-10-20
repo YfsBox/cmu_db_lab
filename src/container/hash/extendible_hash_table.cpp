@@ -115,16 +115,10 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
   Page *page = reinterpret_cast<Page *>(bucket_page);
   page->WLatch();
-  if (bucket_page->ExsitKv(key, comparator_, value)) {
-    page->WUnlatch();
-    buffer_pool_manager_->UnpinPage(directory_page_id_, false);
-    buffer_pool_manager_->UnpinPage(page_id, false);
-    table_latch_.RUnlock();
-    return false;
-  }
   uint32_t bucket_size = 1 << dir_page->GetLocalDepth(page_idx);
   if (bucket_page->NumReadable() < bucket_size) {
     result = bucket_page->Insert(key, value, comparator_);
+    // std::cout << "Insert " << key << " , " << value << "ok,the result is " << result << "\n";
     page->WUnlatch();
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
     buffer_pool_manager_->UnpinPage(page_id, true);
@@ -135,6 +129,7 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
     buffer_pool_manager_->UnpinPage(page_id, false);
     table_latch_.RUnlock();
     result = SplitInsert(transaction, key, value);
+    // std::cout << "SplitInsert " << key << " , " << value << "ok,the result is " << result << "\n";
   }
   return result;
 }
@@ -145,18 +140,31 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   int need_split = -1;
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   auto page_idx = KeyToDirectoryIndex(key, dir_page);
-  if (dir_page->GetLocalDepth(page_idx) >= 9) {
+  auto page_id = dir_page->GetBucketPageId(page_idx);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
+  Page *page_bucket = reinterpret_cast<Page *>(bucket_page);
+  page_bucket->WLatch();
+  uint32_t bucket_size = 1 << dir_page->GetLocalDepth(page_idx);
+  if (bucket_page->NumReadable() < bucket_size) {
+    // LOG_DEBUG("Not need SplitInsert");
+    page_bucket->WUnlatch();
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
+    buffer_pool_manager_->UnpinPage(page_id, false);
+    table_latch_.WUnlock();
+    return Insert(transaction, key, value);
+  }
+  if (dir_page->GetLocalDepth(page_idx) >= 9) {
+    // LOG_DEBUG("local length >= 9");
+    // std::cout << "local >= 9 " << key << " , " << value << "\n";
+    page_bucket->WUnlatch();
+    buffer_pool_manager_->UnpinPage(directory_page_id_, false);
+    buffer_pool_manager_->UnpinPage(page_id, false);
     table_latch_.WUnlock();
     return false;
   }
   if (dir_page->GetGlobalDepth() == dir_page->GetLocalDepth(page_idx)) {
     need_split = dir_page->Expand(page_idx);
   }
-  auto page_id = dir_page->GetBucketPageId(page_idx);
-  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
-  Page *page_bucket = reinterpret_cast<Page *>(bucket_page);
-  page_bucket->WLatch();
   page_id_t new_page_id;
   uint32_t new_mask;
   uint32_t old_mask;
@@ -174,11 +182,9 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
         continue;
       }
       dir_page->IncrLocalDepth(i);
-      // LOG_DEBUG("old hash is 0x%lx,new hash is 0x%lx,the page_idx is 0x%x",old_mask & i,new_mask & i,page_idx);
       auto old_page_idx = old_mask & page_idx;
       auto new_page_idx = new_mask & page_idx;
       if ((old_mask & i) == old_page_idx && (new_mask & i) != new_page_idx) {
-        // LOG_DEBUG("Set the page_idx %lu to new_page_id %d",i,new_page_id);
         dir_page->SetBucketPageId(i, new_page_id);
       }
     }
