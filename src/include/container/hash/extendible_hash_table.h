@@ -1,5 +1,4 @@
 //===----------------------------------------------------------------------===//
-//
 //                         BusTub
 //
 // extendible_hash_table.h
@@ -160,13 +159,12 @@ class ExtendibleHashTable {
    * @param value the value that was removed
    */
   void Merge(Transaction *transaction, const KeyType &key, const ValueType &value);
-  void ReHash(uint32_t idx,HASH_TABLE_BUCKET_TYPE *bucket1,HASH_TABLE_BUCKET_TYPE *bucket2,uint32_t mask);
+  void ReHash(uint32_t idx, HASH_TABLE_BUCKET_TYPE *bucket1, HASH_TABLE_BUCKET_TYPE *bucket2, uint32_t mask);
 
   // member variables
   page_id_t directory_page_id_;
   BufferPoolManager *buffer_pool_manager_;
   KeyComparator comparator_;
-
   // Readers includes inserts and removes, writers are splits and merges
   ReaderWriterLatch table_latch_;
   HashFunction<KeyType> hash_fn_;

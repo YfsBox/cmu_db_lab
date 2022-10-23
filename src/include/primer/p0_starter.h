@@ -40,10 +40,11 @@ void GetTestFileContent() {
   static bool first_enter = true;
   if (first_enter) {
     std::vector<std::string> all_filenames = {
-        "/autograder/bustub/test/container/grading_hash_table_page_test.cpp",
-        "/autograder/bustub/test/container/grading_hash_table_test.cpp"
+        "/autograder/bustub/test/container/grading_hash_table_verification_test.cpp",
+        "/autograder/bustub/test/container/grading_hash_table_concurrent_test.cpp",
+        "/autograder/bustub/test/container/grading_hash_table_leaderboard_test.cpp",
+        "/autograder/bustub/test/container/grading_hash_table_scale_test.cpp",
     };
-    // ReadDir("/autograder/bustub/test/buffer/");
     std::ifstream fin;
     for (const std::string &filename : all_filenames) {
       fin.open(filename, std::ios::in);

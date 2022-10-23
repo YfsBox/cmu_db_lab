@@ -31,7 +31,7 @@ namespace bustub {
 /**
  * A simplified hash table that has all the necessary functionality for aggregations.
  */
-class SimpleAggregationHashTable {
+class SimpleAggregationHashTable { //主要是封装了一些重要的方法
  public:
   /**
    * Construct a new SimpleAggregationHashTable instance.
@@ -204,13 +204,14 @@ class AggregationExecutor : public AbstractExecutor {
   }
 
  private:
+  bool FindKeyFromAggHash(const AggregateKey &aggkey, AggregateValue *aggval);
   /** The aggregation plan node */
   const AggregationPlanNode *plan_;
   /** The child executor that produces tuples over which the aggregation is computed */
   std::unique_ptr<AbstractExecutor> child_;
   /** Simple aggregation hash table */
-  // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
+  SimpleAggregationHashTable aht_;
   /** Simple aggregation hash table iterator */
-  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  SimpleAggregationHashTable::Iterator aht_iterator_;
 };
 }  // namespace bustub

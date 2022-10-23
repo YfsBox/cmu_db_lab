@@ -11,18 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "buffer/parallel_buffer_pool_manager.h"
-#include "buffer/buffer_pool_manager_instance.h"
 #include "../include/common/logger.h"
+#include "buffer/buffer_pool_manager_instance.h"
 
 namespace bustub {
 
 ParallelBufferPoolManager::ParallelBufferPoolManager(size_t num_instances, size_t pool_size, DiskManager *disk_manager,
-                                                     LogManager *log_manager):num_instances_(num_instances),
-pool_size_(pool_size), disk_manager_(disk_manager),
-log_manager_(log_manager) {
+                                                     LogManager *log_manager)
+    : num_instances_(num_instances), pool_size_(pool_size), disk_manager_(disk_manager), log_manager_(log_manager) {
   // Allocate and create individual BufferPoolManagerInstances
   instances_.resize(num_instances_);
-  for (size_t i = 0; i < num_instances_; i ++) {
+  for (size_t i = 0; i < num_instances_; i++) {
     instances_[i] = new BufferPoolManagerInstance(pool_size_, num_instances_, i, disk_manager_, log_manager_);
   }
   next_instance_ = 0;

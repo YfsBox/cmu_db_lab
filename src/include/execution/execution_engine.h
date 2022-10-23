@@ -54,7 +54,6 @@ class ExecutionEngine {
 
     // Prepare the root executor
     executor->Init();
-
     // Execute the query plan
     try {
       Tuple tuple;

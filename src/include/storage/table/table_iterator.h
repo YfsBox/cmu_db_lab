@@ -25,7 +25,7 @@ class TableHeap;
 /**
  * TableIterator enables the sequential scan of a TableHeap.
  */
-class TableIterator {
+class TableIterator {  // 每个Heap对应了多个Iterator，一个表对应一个Heap
   friend class Cursor;
 
  public:

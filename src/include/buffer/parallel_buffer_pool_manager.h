@@ -17,7 +17,6 @@
 #include "storage/disk/disk_manager.h"
 #include "storage/page/page.h"
 
-
 namespace bustub {
 
 class BufferPoolManagerInstance;
@@ -91,7 +90,7 @@ class ParallelBufferPoolManager : public BufferPoolManager {
 
   size_t num_instances_;
   size_t next_instance_;
-  std::vector<BufferPoolManager*> instances_;
+  std::vector<BufferPoolManager *> instances_;
   size_t pool_size_;
   DiskManager *disk_manager_;
   LogManager *log_manager_;

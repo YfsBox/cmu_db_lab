@@ -19,7 +19,7 @@ namespace bustub {
 /**
  * Limit constraints the number of output tuples produced by its child executor.
  */
-class LimitPlanNode : public AbstractPlanNode {
+class LimitPlanNode : public AbstractPlanNode {  // 在外面表明了size,此外内部是基于一个AbstractPlanNode的
  public:
   /**
    * Construct a new LimitPlanNode instance.

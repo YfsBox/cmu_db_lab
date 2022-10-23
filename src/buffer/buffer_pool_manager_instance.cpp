@@ -82,9 +82,10 @@ Page *BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) {
   // 4.   Set the page ID output parameter. Return a pointer to P.
   std::lock_guard<std::mutex> guard(latch_);
   bool is_allpin = true;
-  for (size_t i = 0; i < pool_size_; i ++) {
+  for (size_t i = 0; i < pool_size_; i++) {
     if (pages_[i].GetPinCount() == 0) {
       is_allpin = false;
+      break;
     }
   }
   if (is_allpin) {
@@ -118,7 +119,6 @@ bool BufferPoolManagerInstance::FindFreePage(frame_id_t *frame_id) {
   // LOG_DEBUG("...");
   if (free_list_.empty()) {
     if (auto vicok = replacer_->Victim(frame_id); !vicok) {
-      // LOG_WARN("not find victim page from replacer");
       return false;
     }
     page_id_t rpg_id = pages_[*frame_id].GetPageId();
@@ -181,7 +181,6 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
   std::lock_guard<std::mutex> guard(latch_);
   auto page_it = page_table_.find(page_id);
   if (page_it == page_table_.end()) {  // not exist
-    DeallocatePage(page_id);
     return true;
   }
   if (pages_[page_it->second].GetPinCount() > 0) {
@@ -194,7 +193,6 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
   frame_id_t frame_id = page_it->second;
   page_table_.erase(page_it);
   ResetPage(frame_id);
-  DeallocatePage(page_id);
   free_list_.push_back(frame_id);
   replacer_->Pin(frame_id);
   return true;
@@ -213,7 +211,7 @@ bool BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) {
   }
   pages_[frame_id].pin_count_--;
   pages_[frame_id].is_dirty_ |= is_dirty;
-  if (pages_[frame_id].pin_count_ == 0) {
+  if (pages_[frame_id].pin_count_ <= 0) {
     replacer_->Unpin(frame_id);
   }
   return true;

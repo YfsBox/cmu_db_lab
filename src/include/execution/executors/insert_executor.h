@@ -38,7 +38,6 @@ class InsertExecutor : public AbstractExecutor {
    */
   InsertExecutor(ExecutorContext *exec_ctx, const InsertPlanNode *plan,
                  std::unique_ptr<AbstractExecutor> &&child_executor);
-
   /** Initialize the insert */
   void Init() override;
 
@@ -58,6 +57,9 @@ class InsertExecutor : public AbstractExecutor {
 
  private:
   /** The insert plan node to be executed*/
+  TableInfo *info_;
+  uint32_t curr_cursor_;
+  std::unique_ptr<AbstractExecutor> child_executor_;
   const InsertPlanNode *plan_;
 };
 
