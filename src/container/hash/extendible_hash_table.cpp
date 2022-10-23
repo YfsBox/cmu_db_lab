@@ -137,7 +137,7 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, const ValueType &value) {
   table_latch_.WLock();
-  int need_split = -1;
+  //int need_split = -1;
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   auto page_idx = KeyToDirectoryIndex(key, dir_page);
   auto page_id = dir_page->GetBucketPageId(page_idx);
@@ -163,7 +163,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
     return false;
   }
   if (dir_page->GetGlobalDepth() == dir_page->GetLocalDepth(page_idx)) {
-    need_split = dir_page->Expand(page_idx);
+    dir_page->Expand(page_idx);
   }
   page_id_t new_page_id;
   uint32_t new_mask;
@@ -176,7 +176,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   dir_page->IncrLocalDepth(page_idx);
   new_mask = dir_page->GetLocalDepthMask(page_idx);
 
-  if (need_split == -1) {
+  //if (need_split == -1) {
     for (size_t i = 0; i < dir_page->Size(); i++) {
       if (i == page_idx || page_id != dir_page->GetBucketPageId(i)) {
         continue;
@@ -188,10 +188,11 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
         dir_page->SetBucketPageId(i, new_page_id);
       }
     }
+    /*
   } else {
     dir_page->SetBucketPageId(need_split, new_page_id);
     dir_page->IncrLocalDepth(need_split);
-  }
+  }*/
   ReHash(page_idx, bucket_page, new_bucket, new_mask);
   new_page->WUnlatch();
   buffer_pool_manager_->UnpinPage(new_page_id, true);
