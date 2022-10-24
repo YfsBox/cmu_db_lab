@@ -27,7 +27,6 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
 
   TableIterator end_it = info_->table_->End();
   TableIterator last_it = *iterator_;
-  Value is_true(BOOLEAN,1);
   while (*iterator_ != end_it) {
     Tuple tup = **iterator_;
     Value evalueate;
@@ -35,8 +34,7 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
     if (plan_->GetPredicate() != nullptr) {
       evalueate = plan_->GetPredicate()->Evaluate(&tup, &info_->schema_);
     }
-    if (plan_->GetPredicate() == nullptr || evalueate.CompareEquals(is_true) == CmpBool::CmpTrue) {
-      *rid = tup.GetRid();
+    if (plan_->GetPredicate() == nullptr || evalueate.GetAs<bool>()) {
       std::vector<Value> values;
       auto output_schema = plan_->OutputSchema();
       values.reserve(output_schema->GetColumnCount());
@@ -44,6 +42,7 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
         values.push_back(col.GetExpr()->Evaluate(&tup,output_schema));
       }
       *tuple = Tuple(values,output_schema);
+      *rid = tup.GetRid();
       return true;
     }
   }

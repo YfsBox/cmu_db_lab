@@ -34,7 +34,8 @@ bool DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
   while (child_executor_->Next(&tmp_tup,&tmp_rid)) {
     info_->table_->MarkDelete(tmp_rid,AbstractExecutor::exec_ctx_->GetTransaction());
     for (auto index : indexes) {
-      index->index_->DeleteEntry(tmp_tup, tmp_rid ,AbstractExecutor::exec_ctx_->GetTransaction());
+      index->index_->DeleteEntry(tmp_tup.KeyFromTuple(info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()),
+                                 tmp_rid,AbstractExecutor::exec_ctx_->GetTransaction());
     }
   }
   return false;

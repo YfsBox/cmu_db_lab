@@ -17,6 +17,7 @@
 
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/distinct_plan.h"
+#include "execution/executors/aggregation_executor.h"
 
 namespace bustub {
 
@@ -53,5 +54,8 @@ class DistinctExecutor : public AbstractExecutor {
   const DistinctPlanNode *plan_;
   /** The child executor from which tuples are obtained */
   std::unique_ptr<AbstractExecutor> child_executor_;
+  SimpleAggregationHashTable aht_;
+  SimpleAggregationHashTable::Iterator aht_iterator_;
+
 };
 }  // namespace bustub

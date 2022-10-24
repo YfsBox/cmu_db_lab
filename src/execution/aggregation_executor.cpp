@@ -49,6 +49,7 @@ void AggregationExecutor::Init() {
     AggregateValue aggval = MakeAggregateValue(&tmp_tup);
     aht_.InsertCombine(aggkey, aggval);
   }
+  aht_iterator_ = aht_.Begin();
   child_->Init();
 }
 
@@ -56,13 +57,14 @@ bool AggregationExecutor::Next(Tuple *tuple, RID *rid) {
   Tuple tmp_tup;
   RID tmp_rid;
   Value is_true(BOOLEAN, 1);
+  auto output_schema = plan_->OutputSchema();
   auto have = plan_->GetHaving();
   while (aht_iterator_ != aht_.End()) {
     bool have_ok = false;
     AggregateKey aggkey = aht_iterator_.Key();
     AggregateValue aggval = aht_iterator_.Val();
     ++aht_iterator_;
-    //LOG_DEBUG("loop");
+    LOG_DEBUG("loop");
     if (have != nullptr) {
       auto evaluate = have->EvaluateAggregate(aggkey.group_bys_, aggval.aggregates_);
       have_ok = (evaluate.CompareEquals(is_true) == CmpBool::CmpTrue);
@@ -71,13 +73,11 @@ bool AggregationExecutor::Next(Tuple *tuple, RID *rid) {
     }
     if (have_ok) {
       std::vector<Value> values;
-      values.reserve(aggkey.group_bys_.size() + aggval.aggregates_.size());
-      for (auto key : aggkey.group_bys_) {
-        values.push_back(key);
+      values.reserve(output_schema->GetLength());
+      for (auto &col : output_schema->GetColumns()) {
+        values.push_back(col.GetExpr()->EvaluateAggregate(aggkey.group_bys_,aggval.aggregates_));
       }
-      for (auto val : aggval.aggregates_) {
-        values.push_back(val);
-      }
+      //LOG_DEBUG("the plan.output is %s,value size is %lu,the key size is %lu",plan_->OutputSchema()->ToString().c_str(),values.size(),aggkey.group_bys_.size());
       Tuple res_tup(values,plan_->OutputSchema());
       LOG_DEBUG("The restup is %s", res_tup.ToString(plan_->OutputSchema()).c_str());
       *tuple = res_tup;
