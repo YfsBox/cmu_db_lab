@@ -45,6 +45,7 @@ class SimpleAggregationHashTable { //主要是封装了一些重要的方法
   /** @return The initial aggregrate value for this aggregation executor */
   AggregateValue GenerateInitialAggregateValue() {
     std::vector<Value> values{};
+    // LOG_DEBUG("the agg_types size is %lu and agg_exprs size is %lu", agg_types_.size(), agg_exprs_.size());
     for (const auto &agg_type : agg_types_) {
       switch (agg_type) {
         case AggregationType::CountAggregate:
@@ -102,6 +103,7 @@ class SimpleAggregationHashTable { //主要是封装了一些重要的方法
    * @param agg_val the value to be inserted
    */
   void InsertCombine(const AggregateKey &agg_key, const AggregateValue &agg_val) {
+    // LOG_DEBUG("expr size is %lu, and agg_types size is %lu",agg_exprs_.size() , agg_types_.size());
     if (ht_.count(agg_key) == 0) {
       ht_.insert({agg_key, GenerateInitialAggregateValue()});
     }

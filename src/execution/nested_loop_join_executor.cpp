@@ -28,8 +28,8 @@ bool NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) {
   Tuple left_tup;
   RID left_rid;
 
-  //auto output_schema = plan_->OutputSchema();
-  while (left_executor_->Next(&left_tup, &left_rid)) {/*
+  auto output_schema = plan_->OutputSchema();
+  while (left_executor_->Next(&left_tup, &left_rid)) {
     Tuple right_tup;
     RID right_rid;
     while (right_executor_->Next(&right_tup, &right_rid)) {
@@ -48,7 +48,7 @@ bool NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) {
         return true;
       }
     }
-    right_executor_->Init();*/
+    right_executor_->Init();
   }
   return false;
 }

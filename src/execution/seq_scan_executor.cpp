@@ -26,27 +26,25 @@ void SeqScanExecutor::Init() {
 bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
 
   TableIterator end_it = info_->table_->End();
-  TableIterator last_it = *iterator_;
+  //TableIterator last_it = *iterator_;
+  auto output_schema = plan_->OutputSchema();
   while (*iterator_ != end_it) {
     Tuple tup = **iterator_;
-    Value evalueate;
+    // LOG_DEBUG("the Tuple is %s",tup.ToString(output_schema).c_str());
     (*iterator_)++;
-    if (plan_->GetPredicate() != nullptr) {
-      evalueate = plan_->GetPredicate()->Evaluate(&tup, &info_->schema_);
-    }
-    if (plan_->GetPredicate() == nullptr || evalueate.GetAs<bool>()) {
+    if (plan_->GetPredicate() == nullptr || plan_->GetPredicate()->Evaluate(&tup, &info_->schema_).GetAs<bool>()) {
       std::vector<Value> values;
-      auto output_schema = plan_->OutputSchema();
       values.reserve(output_schema->GetColumnCount());
-      for (auto &col : output_schema->GetColumns()) {
-        values.push_back(col.GetExpr()->Evaluate(&tup,output_schema));
+      for (size_t i = 0; i < output_schema->GetColumnCount(); i++) {
+        values.push_back(output_schema->GetColumn(i).GetExpr()->Evaluate(&tup,&info_->schema_));
       }
-      *tuple = Tuple(values,output_schema);
+      Tuple res_tup(std::move(values), output_schema);
+      *tuple = res_tup;
       *rid = tup.GetRid();
       return true;
     }
   }
-  *iterator_ = last_it;
+  //*iterator_ = last_it;
   return false;
 }
 

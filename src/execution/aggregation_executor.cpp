@@ -67,7 +67,7 @@ bool AggregationExecutor::Next(Tuple *tuple, RID *rid) {
     LOG_DEBUG("loop");
     if (have != nullptr) {
       auto evaluate = have->EvaluateAggregate(aggkey.group_bys_, aggval.aggregates_);
-      have_ok = (evaluate.CompareEquals(is_true) == CmpBool::CmpTrue);
+      have_ok = (evaluate.GetAs<bool>());
     } else {
       have_ok = true;
     }
