@@ -34,7 +34,7 @@ class ColumnValueExpression : public AbstractExpression {
       : AbstractExpression({}, ret_type), tuple_idx_{tuple_idx}, col_idx_{col_idx} {}
 
   Value Evaluate(const Tuple *tuple, const Schema *schema) const override { return tuple->GetValue(schema, col_idx_); }
-
+  // 由Evaluate可以得出来value
   Value EvaluateJoin(const Tuple *left_tuple, const Schema *left_schema, const Tuple *right_tuple,
                      const Schema *right_schema) const override {
     return tuple_idx_ == 0 ? left_tuple->GetValue(left_schema, col_idx_)
@@ -50,7 +50,7 @@ class ColumnValueExpression : public AbstractExpression {
 
  private:
   /** Tuple index 0 = left side of join, tuple index 1 = right side of join */
-  uint32_t tuple_idx_;
+  uint32_t tuple_idx_;  // 决定连接key的col_idx对应左端还是右端
   /** Column index refers to the index within the schema of the tuple, e.g. schema {A,B,C} has indexes {0,1,2} */
   uint32_t col_idx_;
 };

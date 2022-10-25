@@ -14,13 +14,79 @@
 
 #include <memory>
 #include <utility>
+#include <unordered_map>
+#include <vector>
 
+#include "common/util/hash_util.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/hash_join_plan.h"
 #include "storage/table/tuple.h"
 
+
 namespace bustub {
+
+class HashJoinKey {
+ public:
+  Value value_;
+  bool operator==(const HashJoinKey &key) const {
+    auto cmp = value_.CompareEquals(key.value_);
+    return cmp == CmpBool::CmpTrue;
+  }
+};
+
+class HashJoinHashFunc {
+ public:
+  std::size_t operator()(const bustub::HashJoinKey &hashJoinKey) const {
+    size_t curr_hash = 0;
+    curr_hash = bustub::HashUtil::CombineHashes(curr_hash, bustub::HashUtil::HashValue(&hashJoinKey.value_));
+    return curr_hash;
+  }
+};
+
+class SimpleHashJoinHashTable {
+ public:
+  using tuples = std::vector<Tuple>;
+
+  SimpleHashJoinHashTable() = default;
+  void Insert(const HashJoinKey &hashkey, const Tuple &tuple) {
+    if (buckets_.count(hashkey) == 0) {
+      tuples init_tuples;
+      init_tuples.push_back(tuple);
+      buckets_.insert({hashkey, std::move(init_tuples)});
+    } else {
+      buckets_[hashkey].push_back(tuple);
+    }
+  }
+
+  bool GetTuples(const HashJoinKey &hashkey, tuples *tuples) const {
+    auto find_it = buckets_.find(hashkey);
+    if (find_it == buckets_.end()) {
+      return false;
+    }
+    *tuples = find_it->second;
+    return true;
+  }
+
+  Tuple GetTuple(const HashJoinKey &hashkey, uint32_t idx) const {
+    assert(idx >= 0);
+    auto find_it = buckets_.find(hashkey);
+    assert(find_it != buckets_.end());
+    return find_it->second[idx];
+  }
+
+  int32_t GetSize(const HashJoinKey &hashkey) const {
+    auto find_it = buckets_.find(hashkey);
+    if (find_it == buckets_.end()) {
+      return -1;
+    }
+    return static_cast<int32_t>(find_it->second.size());
+  }
+
+ private:
+  std::unordered_map<HashJoinKey, tuples, HashJoinHashFunc> buckets_;
+};
+
 
 /**
  * HashJoinExecutor executes a nested-loop JOIN on two tables.
@@ -53,7 +119,14 @@ class HashJoinExecutor : public AbstractExecutor {
 
  private:
   /** The NestedLoopJoin plan node to be executed. */
-  const HashJoinPlanNode *plan_;
+  bool GetJoinTuple(const Tuple &left_tup, Tuple *joined_tup, const Tuple &right_tup) const;
+
+  SimpleHashJoinHashTable hashjoin_table_;
+  const HashJoinPlanNode *plan_;  // 其中还有描述了左key和右key
+  std::unique_ptr<AbstractExecutor> left_child_;
+  std::unique_ptr<AbstractExecutor> right_child_;
+  std::pair<HashJoinKey, int32_t> curr_left_tuple_;
+  Tuple curr_right_tuple_;
 };
 
 }  // namespace bustub

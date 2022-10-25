@@ -14,13 +14,13 @@
 
 namespace bustub {
 
-std::vector<const AbstractExpression *> DistinctExecutor::empty_agg_exprs_ = {};
-std::vector<AggregationType> DistinctExecutor::empty_agg_types_ = {};
+std::vector<const AbstractExpression *> DistinctExecutor::empty_agg_exprs = {};
+std::vector<AggregationType> DistinctExecutor::empty_agg_types = {};
 
 DistinctExecutor::DistinctExecutor(ExecutorContext *exec_ctx, const DistinctPlanNode *plan,
                                    std::unique_ptr<AbstractExecutor> &&child_executor)
     : AbstractExecutor(exec_ctx), plan_(plan), child_executor_(std::move(child_executor)),
-      aht_(empty_agg_exprs_, empty_agg_types_),
+      aht_(empty_agg_exprs, empty_agg_types),
       aht_iterator_(aht_.Begin()){}
 
 void DistinctExecutor::Init() {

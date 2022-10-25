@@ -50,8 +50,8 @@ class DistinctExecutor : public AbstractExecutor {
   const Schema *GetOutputSchema() override { return plan_->OutputSchema(); };
 
  private:
-  static std::vector<const AbstractExpression *> empty_agg_exprs_;
-  static std::vector<AggregationType> empty_agg_types_;
+  static std::vector<const AbstractExpression *> empty_agg_exprs;
+  static std::vector<AggregationType> empty_agg_types;
   /** The distinct plan node to be executed */
   const DistinctPlanNode *plan_;
   /** The child executor from which tuples are obtained */
