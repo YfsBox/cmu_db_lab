@@ -51,8 +51,10 @@ bool InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
     while (child_executor_->Next(&tmp_next, &tmp_rid)) {
       info_->table_->InsertTuple(tmp_next, &tmp_rid, exec_ctx_->GetTransaction());
       auto indexes = exec_ctx_->GetCatalog()->GetTableIndexes(info_->name_);
-      for (auto &info : indexes) {
-        info->index_->InsertEntry(tmp_next, tmp_rid, AbstractExecutor::exec_ctx_->GetTransaction());
+      for (auto &index : indexes) {
+        index->index_->InsertEntry(
+            tmp_next.KeyFromTuple(info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
+            AbstractExecutor::exec_ctx_->GetTransaction());
       }
     }
   }
