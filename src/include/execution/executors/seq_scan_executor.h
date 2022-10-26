@@ -12,8 +12,8 @@
 
 #pragma once
 
-#include <vector>
 #include <memory>
+#include <vector>
 
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
@@ -33,7 +33,7 @@ class SeqScanExecutor : public AbstractExecutor {
    * @param plan The sequential scan plan to be executed
    */
   SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNode *plan);
-  ~SeqScanExecutor();
+  ~SeqScanExecutor() override;
   /** Initialize the sequential scan */
   void Init() override;
 

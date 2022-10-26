@@ -13,8 +13,8 @@
 #pragma once
 
 #include <memory>
-#include <utility>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/util/hash_util.h"
@@ -22,7 +22,6 @@
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/hash_join_plan.h"
 #include "storage/table/tuple.h"
-
 
 namespace bustub {
 
@@ -85,7 +84,6 @@ class SimpleHashJoinHashTable {
  private:
   std::unordered_map<HashJoinKey, tuples, HashJoinHashFunc> buckets_;
 };
-
 
 /**
  * HashJoinExecutor executes a nested-loop JOIN on two tables.

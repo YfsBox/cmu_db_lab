@@ -137,7 +137,6 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, const ValueType &value) {
   table_latch_.WLock();
-  //int need_split = -1;
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   auto page_idx = KeyToDirectoryIndex(key, dir_page);
   auto page_id = dir_page->GetBucketPageId(page_idx);
@@ -154,8 +153,6 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
     return Insert(transaction, key, value);
   }
   if (dir_page->GetLocalDepth(page_idx) >= 9) {
-    // LOG_DEBUG("local length >= 9");
-    // std::cout << "local >= 9 " << key << " , " << value << "\n";
     page_bucket->WUnlatch();
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
     buffer_pool_manager_->UnpinPage(page_id, false);
@@ -176,23 +173,17 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   dir_page->IncrLocalDepth(page_idx);
   new_mask = dir_page->GetLocalDepthMask(page_idx);
 
-  //if (need_split == -1) {
-    for (size_t i = 0; i < dir_page->Size(); i++) {
-      if (i == page_idx || page_id != dir_page->GetBucketPageId(i)) {
-        continue;
-      }
-      dir_page->IncrLocalDepth(i);
-      auto old_page_idx = old_mask & page_idx;
-      auto new_page_idx = new_mask & page_idx;
-      if ((old_mask & i) == old_page_idx && (new_mask & i) != new_page_idx) {
-        dir_page->SetBucketPageId(i, new_page_id);
-      }
+  for (size_t i = 0; i < dir_page->Size(); i++) {
+    if (i == page_idx || page_id != dir_page->GetBucketPageId(i)) {
+      continue;
     }
-    /*
-  } else {
-    dir_page->SetBucketPageId(need_split, new_page_id);
-    dir_page->IncrLocalDepth(need_split);
-  }*/
+    dir_page->IncrLocalDepth(i);
+    auto old_page_idx = old_mask & page_idx;
+    auto new_page_idx = new_mask & page_idx;
+    if ((old_mask & i) == old_page_idx && (new_mask & i) != new_page_idx) {
+      dir_page->SetBucketPageId(i, new_page_id);
+    }
+  }
   ReHash(page_idx, bucket_page, new_bucket, new_mask);
   new_page->WUnlatch();
   buffer_pool_manager_->UnpinPage(new_page_id, true);

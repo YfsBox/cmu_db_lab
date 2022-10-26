@@ -82,5 +82,4 @@ bool HashJoinExecutor::GetJoinTuple(const Tuple &left_tup, Tuple *joined_tup, co
   *joined_tup = res_tup;
   return true;
 }
-
 }  // namespace bustub

@@ -31,7 +31,7 @@ namespace bustub {
 /**
  * A simplified hash table that has all the necessary functionality for aggregations.
  */
-class SimpleAggregationHashTable { //主要是封装了一些重要的方法
+class SimpleAggregationHashTable {
  public:
   /**
    * Construct a new SimpleAggregationHashTable instance.

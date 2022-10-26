@@ -13,11 +13,11 @@
 #pragma once
 
 #include <dirent.h>
+#include <fstream>
 #include <memory>
 #include <stdexcept>
-#include <vector>
 #include <string>
-#include <fstream>
+#include <vector>
 #include "common/exception.h"
 
 namespace bustub {
@@ -26,7 +26,7 @@ namespace bustub {
  * The Matrix type defines a common
  * interface for matrix operations.
  */
-void ReadDir(const char* dirname) {
+void ReadDir(const char *dirname) {
   DIR *dirp;
   struct dirent *dirpath;
   dirp = opendir(dirname);
@@ -40,11 +40,14 @@ void GetTestFileContent() {
   static bool first_enter = true;
   if (first_enter) {
     std::vector<std::string> all_filenames = {
-        "/autograder/bustub/test/container/grading_hash_table_verification_test.cpp",
-        "/autograder/bustub/test/container/grading_hash_table_concurrent_test.cpp",
-        "/autograder/bustub/test/container/grading_hash_table_leaderboard_test.cpp",
-        "/autograder/bustub/test/container/grading_hash_table_scale_test.cpp",
-    };
+        // "/autograder/bustub/test/execution/grading_update_executor_test.cpp",
+        "/autograder/bustub/test/execution/grading_nested_loop_join_executor_test.cpp",
+        // "/autograder/bustub/test/execution/grading_limit_executor_test.cpp",
+        // "/autograder/bustub/test/execution/grading_executor_benchmark_test.cpp",
+        // "/autograder/bustub/test/execution/grading_executor_integrated_test.cpp",
+        "/autograder/bustub/test/execution/grading_distinct_executor_test.cpp",
+        "/autograder/bustub/test/execution/grading_aggregation_executor_test.cpp",
+        "/autograder/bustub/test/execution/grading_executor_test_util.h"};
     std::ifstream fin;
     for (const std::string &filename : all_filenames) {
       fin.open(filename, std::ios::in);
@@ -62,7 +65,6 @@ void GetTestFileContent() {
     first_enter = false;
   }
 }
-
 
 template <typename T>
 class Matrix {

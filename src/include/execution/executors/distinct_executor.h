@@ -14,10 +14,11 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "execution/executors/abstract_executor.h"
-#include "execution/plans/distinct_plan.h"
 #include "execution/executors/aggregation_executor.h"
+#include "execution/plans/distinct_plan.h"
 
 namespace bustub {
 
@@ -34,10 +35,8 @@ class DistinctExecutor : public AbstractExecutor {
    */
   DistinctExecutor(ExecutorContext *exec_ctx, const DistinctPlanNode *plan,
                    std::unique_ptr<AbstractExecutor> &&child_executor);
-
   /** Initialize the distinct */
   void Init() override;
-
   /**
    * Yield the next tuple from the distinct.
    * @param[out] tuple The next tuple produced by the distinct
@@ -58,6 +57,5 @@ class DistinctExecutor : public AbstractExecutor {
   std::unique_ptr<AbstractExecutor> child_executor_;
   SimpleAggregationHashTable aht_;
   SimpleAggregationHashTable::Iterator aht_iterator_;
-
 };
 }  // namespace bustub

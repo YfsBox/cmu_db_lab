@@ -31,8 +31,6 @@ bool LimitExecutor::Next(Tuple *tuple, RID *rid) {
   }
   Tuple tmp_tup;
   RID tmp_rid;
-  auto output_schema = plan_->OutputSchema();
-  auto cols = output_schema->GetColumns();
   while (child_executor_->Next(&tmp_tup, &tmp_rid)) {
     *tuple = tmp_tup;
     *rid = tmp_rid;

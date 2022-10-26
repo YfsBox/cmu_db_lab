@@ -14,9 +14,10 @@
 
 namespace bustub {
 
-SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNode *plan) : AbstractExecutor(exec_ctx), info_(nullptr), iterator_(nullptr), plan_(plan) {}
+SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNode *plan)
+    : AbstractExecutor(exec_ctx), info_(nullptr), iterator_(nullptr), plan_(plan) {}
 
-SeqScanExecutor::~SeqScanExecutor() {}
+SeqScanExecutor::~SeqScanExecutor() = default;
 
 void SeqScanExecutor::Init() {
   info_ = exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid());
@@ -24,9 +25,7 @@ void SeqScanExecutor::Init() {
 }
 
 bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
-
   TableIterator end_it = info_->table_->End();
-  //TableIterator last_it = *iterator_;
   auto output_schema = plan_->OutputSchema();
   while (*iterator_ != end_it) {
     Tuple tup = **iterator_;
@@ -36,7 +35,7 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
       std::vector<Value> values;
       values.reserve(output_schema->GetColumnCount());
       for (size_t i = 0; i < output_schema->GetColumnCount(); i++) {
-        values.push_back(output_schema->GetColumn(i).GetExpr()->Evaluate(&tup,&info_->schema_));
+        values.push_back(output_schema->GetColumn(i).GetExpr()->Evaluate(&tup, &info_->schema_));
       }
       Tuple res_tup(std::move(values), output_schema);
       *tuple = res_tup;
@@ -44,8 +43,6 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
       return true;
     }
   }
-  //*iterator_ = last_it;
   return false;
 }
-
 }  // namespace bustub
