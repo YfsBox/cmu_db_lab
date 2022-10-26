@@ -69,7 +69,6 @@ class SimpleHashJoinHashTable {
   }
 
   Tuple GetTuple(const HashJoinKey &hashkey, uint32_t idx) const {
-    assert(idx >= 0);
     auto find_it = buckets_.find(hashkey);
     assert(find_it != buckets_.end());
     return find_it->second[idx];

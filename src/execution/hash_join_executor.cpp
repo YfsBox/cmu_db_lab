@@ -30,6 +30,7 @@ void HashJoinExecutor::Init() {
   const AbstractExpression *left_express = plan_->LeftJoinKeyExpression();
   const ColumnValueExpression *left_colval_express = static_cast<const ColumnValueExpression *>(left_express);
   while (left_child_->Next(&tmp_tuple, &tmp_rid)) {
+    // LOG_DEBUG("the value is %s", tmp_tuple.ToString(right_child_->GetOutputSchema()).c_str());
     Value value = left_colval_express->Evaluate(&tmp_tuple, left_child_->GetOutputSchema());
     HashJoinKey joinkey{value};
     hashjoin_table_.Insert(joinkey, tmp_tuple);
