@@ -35,7 +35,7 @@ class TransactionManager;
 class LockManager {
   enum class LockMode { SHARED, EXCLUSIVE };
 
-  class LockRequest {
+  class LockRequest {  // 事务，lockmode，是否得到允许
    public:
     LockRequest(txn_id_t txn_id, LockMode lock_mode) : txn_id_(txn_id), lock_mode_(lock_mode), granted_(false) {}
 
@@ -44,7 +44,7 @@ class LockManager {
     bool granted_;
   };
 
-  class LockRequestQueue {
+  class LockRequestQueue {  // 一个处理队列,一个条件变量
    public:
     std::list<LockRequest> request_queue_;
     // for notifying blocked transactions on this rid
@@ -106,7 +106,6 @@ class LockManager {
 
  private:
   std::mutex latch_;
-
   /** Lock table for lock requests. */
   std::unordered_map<RID, LockRequestQueue> lock_table_;
 };
