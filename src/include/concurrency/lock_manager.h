@@ -105,6 +105,12 @@ class LockManager {
   bool Unlock(Transaction *txn, const RID &rid);
 
  private:
+  enum class LockOpType {
+    SHARED_OP,
+    EXCLUSIVE_OP,
+    UPGRADE_OP,
+  };
+  bool CanGrant(Transaction *txn, const RID &rid,const LockOpType &mode);
   std::mutex latch_;
   /** Lock table for lock requests. */
   std::unordered_map<RID, LockRequestQueue> lock_table_;

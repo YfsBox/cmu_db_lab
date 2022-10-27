@@ -18,26 +18,36 @@
 
 namespace bustub {
 
-bool LockManager::LockShared(Transaction *txn, const RID &rid) {
-  std::unique_lock<std::mutex> guard(latch_);
-  auto curr_state = txn->GetState();
-  if (curr_state != TransactionState::GROWING) {
-    txn->SetState(TransactionState::ABORTED);
-    return false;
-  }
-  txn->GetSharedLockSet()->emplace(rid);
-  txn_id_t self_txn_id = txn->GetTransactionId();
+bool LockManager::CanGrant(Transaction *txn, const RID &rid,const LockOpType &mode) {
   bool can_grant = true;
   auto start_it = lock_table_[rid].request_queue_.begin();
   for (auto reit = start_it;
-       reit != lock_table_[rid].request_queue_.end(); reit++) {
+       reit != lock_table_[rid].request_queue_.end(); ++reit) {
     if (!reit->granted_) {
       can_grant = false;
       break;
     }
   }
-  can_grant &= !(start_it->txn_id_ != self_txn_id && start_it->lock_mode_ == LockMode::EXCLUSIVE
-                 && start_it->txn_id_ != INVALID_TXN_ID);
+  if (mode == LockOpType::SHARED_OP) {
+    can_grant &= !(start_it->txn_id_ != txn->GetTransactionId() && start_it->lock_mode_ == LockMode::EXCLUSIVE
+                   && start_it->txn_id_ != INVALID_TXN_ID);
+  } else if (mode == LockOpType::EXCLUSIVE_OP) {
+    can_grant &= (start_it->txn_id_ == txn->GetTransactionId() || start_it->txn_id_ == INVALID_TXN_ID);
+  } else {
+
+  }
+  return can_grant;
+}
+
+bool LockManager::LockShared(Transaction *txn, const RID &rid) {
+  std::unique_lock<std::mutex> guard(latch_);
+  if (txn->GetState() != TransactionState::GROWING) {
+    txn->SetState(TransactionState::ABORTED);
+    return false;
+  }
+  txn->GetSharedLockSet()->emplace(rid);
+  txn_id_t self_txn_id = txn->GetTransactionId();
+  bool can_grant = CanGrant(txn, rid, LockOpType::SHARED_OP);
 
   LockRequest request(self_txn_id, LockMode::SHARED);
   lock_table_[rid].request_queue_.push_front(request);
@@ -45,15 +55,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
 
   while (!can_grant) {
     lock_table_[rid].cv_.wait(guard);
-    can_grant = true;
-    for (auto reit = start_it; reit != lock_table_[rid].request_queue_.end(); reit++) {
-      if (!reit->granted_) {
-        can_grant = false;
-        break;
-      }
-    }
-    can_grant &= !(start_it->txn_id_ != self_txn_id && start_it->lock_mode_ == LockMode::EXCLUSIVE
-                   && start_it->txn_id_ != INVALID_TXN_ID);
+    can_grant = CanGrant(txn, rid, LockOpType::SHARED_OP);
   }
 
   lock_table_[rid].upgrading_ = self_txn_id;
@@ -65,23 +67,13 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
 
 bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
   std::unique_lock<std::mutex> guard(latch_);
-  auto curr_state = txn->GetState();
-  if (curr_state != TransactionState::GROWING) {
+  if (txn->GetState() != TransactionState::GROWING) {
     txn->SetState(TransactionState::ABORTED);
     return false;
   }
   txn->GetExclusiveLockSet()->emplace(rid);
   txn_id_t self_txn_id = txn->GetTransactionId();
-  bool can_grant = true;
-  auto start_it = lock_table_[rid].request_queue_.begin();
-  for (auto reit = start_it;
-       reit != lock_table_[rid].request_queue_.end(); reit++) {
-    if (!reit->granted_) {
-      can_grant = false;
-      break;
-    }
-  }
-  can_grant &= (start_it->txn_id_ == self_txn_id || start_it->txn_id_ == INVALID_TXN_ID);
+  bool can_grant = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP);
 
   LockRequest request(self_txn_id, LockMode::EXCLUSIVE);
   lock_table_[rid].request_queue_.push_front(request);
@@ -89,14 +81,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
 
   while (!can_grant) {
     lock_table_[rid].cv_.wait(guard);
-    can_grant = true;
-    for (auto reit = start_it; reit != lock_table_[rid].request_queue_.end(); reit++) {
-      if (!reit->granted_) {
-        can_grant = false;
-        break;
-      }
-    }
-    can_grant &= (start_it->txn_id_ == self_txn_id || start_it->txn_id_ == INVALID_TXN_ID);
+    can_grant = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP);
   }
 
   lock_table_[rid].upgrading_ = self_txn_id;
@@ -104,25 +89,43 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
   lock_table_[rid].cv_.notify_all();
 
   return true;
-
 }
 
 bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
+  std::unique_lock<std::mutex> guard(latch_);
+
+  if (txn->GetState() != TransactionState::GROWING) {
+    txn->SetState(TransactionState::ABORTED);
+    return false;
+  }
   txn->GetSharedLockSet()->erase(rid);
   txn->GetExclusiveLockSet()->emplace(rid);
+
   return true;
 }
 
 bool LockManager::Unlock(Transaction *txn, const RID &rid) {
-
+  std::unique_lock<std::mutex> guard(latch_);
   txn->GetSharedLockSet()->erase(rid);
   txn->GetExclusiveLockSet()->erase(rid);
-
   if (lock_table_[rid].upgrading_ == txn->GetTransactionId()) {
     lock_table_[rid].upgrading_ = INVALID_TXN_ID;
   }
-
+  if (txn->GetState() == TransactionState::ABORTED) {
+    return false;
+  }
+  /*
+  txn_id_t txn_id = txn->GetTransactionId();
+  for (auto reqit = lock_table_[rid].request_queue_.begin(); reqit !=
+       lock_table_[rid].request_queue_.end();) {
+    if (reqit->txn_id_ == txn_id && reqit->granted_) {
+      lock_table_[rid].request_queue_.erase(reqit);
+    } else {
+      reqit++;
+    }
+  }*/
   txn->SetState(TransactionState::SHRINKING);
+  lock_table_[rid].cv_.notify_all();
   return true;
 }
 
