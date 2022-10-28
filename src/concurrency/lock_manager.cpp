@@ -43,6 +43,9 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
   std::unique_lock<std::mutex> guard(latch_);
   if (txn->GetState() != TransactionState::GROWING) {
     txn->SetState(TransactionState::ABORTED);
+    if (txn->GetState() == TransactionState::SHRINKING) {
+      throw AbortReason::LOCK_ON_SHRINKING;
+    }
     return false;
   }
   txn->GetSharedLockSet()->emplace(rid);
@@ -69,6 +72,9 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
   std::unique_lock<std::mutex> guard(latch_);
   if (txn->GetState() != TransactionState::GROWING) {
     txn->SetState(TransactionState::ABORTED);
+    if (txn->GetState() == TransactionState::SHRINKING) {
+      throw AbortReason::LOCK_ON_SHRINKING;
+    }
     return false;
   }
   txn->GetExclusiveLockSet()->emplace(rid);
@@ -96,11 +102,39 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
 
   if (txn->GetState() != TransactionState::GROWING) {
     txn->SetState(TransactionState::ABORTED);
+    if (txn->GetState() == TransactionState::SHRINKING) {
+      throw AbortReason::LOCK_ON_SHRINKING;
+    }
     return false;
   }
+  // 首先找到
+  auto find_it = lock_table_[rid].request_queue_.begin();
+  for (;find_it != lock_table_[rid].request_queue_.end(); ++find_it) {
+    if (find_it->granted_ && find_it->lock_mode_ == LockMode::SHARED && find_it->txn_id_ == txn->GetTransactionId()) {
+      break;
+    }
+  }
+  if (find_it == lock_table_[rid].request_queue_.end()) {
+    txn->SetState(TransactionState::ABORTED);
+    throw AbortReason::DEADLOCK;
+  }
+  bool can_upgrade = true;
+  auto rest_it = find_it;
+  rest_it++;
+  for (; rest_it != lock_table_[rid].request_queue_.end(); ++rest_it) {
+    if (rest_it->granted_ && rest_it->txn_id_ != txn->GetTransactionId()) {
+      can_upgrade = false;
+      break;
+    }
+  }
+  if (!can_upgrade) {
+    txn->SetState(TransactionState::ABORTED);
+    throw AbortReason::UPGRADE_CONFLICT;
+  }
+
   txn->GetSharedLockSet()->erase(rid);
   txn->GetExclusiveLockSet()->emplace(rid);
-
+  find_it->lock_mode_ = LockMode::EXCLUSIVE;
   return true;
 }
 
@@ -114,16 +148,17 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
   if (txn->GetState() == TransactionState::ABORTED) {
     return false;
   }
-  /*
+
   txn_id_t txn_id = txn->GetTransactionId();
   for (auto reqit = lock_table_[rid].request_queue_.begin(); reqit !=
        lock_table_[rid].request_queue_.end();) {
     if (reqit->txn_id_ == txn_id && reqit->granted_) {
-      lock_table_[rid].request_queue_.erase(reqit);
+      reqit = lock_table_[rid].request_queue_.erase(reqit);  // 在容器中进行移除的注意事项
     } else {
       reqit++;
     }
-  }*/
+  }
+
   txn->SetState(TransactionState::SHRINKING);
   lock_table_[rid].cv_.notify_all();
   return true;
