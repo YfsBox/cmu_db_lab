@@ -28,11 +28,12 @@
 namespace bustub {
 
 class TransactionManager;
-
 /**
  * LockManager handles transactions asking for locks on records.
  */
 class LockManager {
+  using txns = std::vector<txn_id_t>;
+
   enum class LockMode { SHARED, EXCLUSIVE };
 
   class LockRequest {  // 事务，lockmode，是否得到允许
@@ -43,6 +44,7 @@ class LockManager {
     LockMode lock_mode_;
     bool granted_;
   };
+  using LockReqIterator = std::list<LockRequest>::iterator;
 
   class LockRequestQueue {  // 一个处理队列,一个条件变量
    public:
@@ -110,10 +112,13 @@ class LockManager {
     EXCLUSIVE_OP,
     UPGRADE_OP,
   };
-  bool CanGrant(Transaction *txn, const RID &rid,const LockOpType &mode);
+  bool CanGrant(Transaction *txn, const RID &rid,const LockOpType &mode, std::list<LockRequest>::iterator lock_it);
+  bool IsConflictLock(Transaction *txn, const LockRequest &request, const LockOpType &locktype) const;
+
   std::mutex latch_;
   /** Lock table for lock requests. */
   std::unordered_map<RID, LockRequestQueue> lock_table_;
+  std::unordered_map<txn_id_t, txns> wait_table_;
 };
 
 }  // namespace bustub

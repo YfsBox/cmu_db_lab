@@ -18,25 +18,54 @@
 
 namespace bustub {
 
-bool LockManager::CanGrant(Transaction *txn, const RID &rid,const LockOpType &mode) {
+bool LockManager::IsConflictLock(Transaction *txn, const LockRequest &request, const LockOpType &locktype) const {
+  txn_id_t self_txn_id = txn->GetTransactionId();
+  if (locktype == LockOpType::SHARED_OP) {
+    return !(request.txn_id_ != self_txn_id && request.lock_mode_ == LockMode::EXCLUSIVE
+             && request.txn_id_ != INVALID_TXN_ID);
+  }
+  if (locktype == LockOpType::EXCLUSIVE_OP) {
+    return (request.txn_id_ == self_txn_id || request.txn_id_ == INVALID_TXN_ID);
+  }
+  return false;
+}
+
+
+bool LockManager::CanGrant(Transaction *txn, const RID &rid, const LockOpType &mode, std::list<LockRequest>::iterator lock_it) {
   bool can_grant = true;
+  txn_id_t self_txn_id = txn->GetTransactionId();
   auto start_it = lock_table_[rid].request_queue_.begin();
-  for (auto reit = start_it;
-       reit != lock_table_[rid].request_queue_.end(); ++reit) {
+  std::vector<txn_id_t> abort_txns;
+
+  for (auto reit = start_it; reit != lock_table_[rid].request_queue_.end(); ++reit) {
     if (!reit->granted_) {
       can_grant = false;
       break;
     }
+    bool is_conflict = IsConflictLock(txn, *reit, mode);
+    can_grant &= is_conflict;
+    if (!can_grant) {
+      break;
+    }
   }
-  if (mode == LockOpType::SHARED_OP) {
-    can_grant &= !(start_it->txn_id_ != txn->GetTransactionId() && start_it->lock_mode_ == LockMode::EXCLUSIVE
-                   && start_it->txn_id_ != INVALID_TXN_ID);
-  } else if (mode == LockOpType::EXCLUSIVE_OP) {
-    can_grant &= (start_it->txn_id_ == txn->GetTransactionId() || start_it->txn_id_ == INVALID_TXN_ID);
-  } else {
-
+  if (can_grant) {
+    return true;
   }
-  return can_grant;
+  bool have_abort = false;
+  for (auto reit = start_it; reit != lock_table_[rid].request_queue_.end(); ++reit) {
+    txn_id_t txn_id = reit->txn_id_;
+    if (txn_id > self_txn_id && !IsConflictLock(txn, *reit, mode)) {
+      // LOG_DEBUG("txn %d push ths %d to abort",self_txn_id , txn_id);
+      Transaction *tmp_txn = TransactionManager::GetTransaction(txn_id);
+      tmp_txn->SetState(TransactionState::ABORTED);
+      have_abort = true;
+    }
+  }
+  if (have_abort) {
+    lock_table_[rid].cv_.notify_all();
+    return true;
+  }
+  return false;
 }
 
 bool LockManager::LockShared(Transaction *txn, const RID &rid) {
@@ -50,7 +79,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
   }
   txn->GetSharedLockSet()->emplace(rid);
   txn_id_t self_txn_id = txn->GetTransactionId();
-  bool can_grant = CanGrant(txn, rid, LockOpType::SHARED_OP);
+  bool can_grant = CanGrant(txn, rid, LockOpType::SHARED_OP, lock_table_[rid].request_queue_.begin());
 
   LockRequest request(self_txn_id, LockMode::SHARED);
   lock_table_[rid].request_queue_.push_front(request);
@@ -58,7 +87,10 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
 
   while (!can_grant) {
     lock_table_[rid].cv_.wait(guard);
-    can_grant = CanGrant(txn, rid, LockOpType::SHARED_OP);
+    if (txn->GetState() == TransactionState::ABORTED) {
+      throw AbortReason::DEADLOCK;
+    }
+    can_grant = CanGrant(txn, rid, LockOpType::SHARED_OP, request_it);
   }
 
   lock_table_[rid].upgrading_ = self_txn_id;
@@ -79,7 +111,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
   }
   txn->GetExclusiveLockSet()->emplace(rid);
   txn_id_t self_txn_id = txn->GetTransactionId();
-  bool can_grant = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP);
+  bool can_grant = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP, lock_table_[rid].request_queue_.begin());
 
   LockRequest request(self_txn_id, LockMode::EXCLUSIVE);
   lock_table_[rid].request_queue_.push_front(request);
@@ -87,7 +119,10 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
 
   while (!can_grant) {
     lock_table_[rid].cv_.wait(guard);
-    can_grant = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP);
+    if (txn->GetState() == TransactionState::ABORTED) {
+      return false;
+    }
+    can_grant = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP, request_it);
   }
 
   lock_table_[rid].upgrading_ = self_txn_id;
@@ -107,7 +142,6 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
     }
     return false;
   }
-  // 首先找到
   auto find_it = lock_table_[rid].request_queue_.begin();
   for (;find_it != lock_table_[rid].request_queue_.end(); ++find_it) {
     if (find_it->granted_ && find_it->lock_mode_ == LockMode::SHARED && find_it->txn_id_ == txn->GetTransactionId()) {
@@ -145,9 +179,6 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
   if (lock_table_[rid].upgrading_ == txn->GetTransactionId()) {
     lock_table_[rid].upgrading_ = INVALID_TXN_ID;
   }
-  if (txn->GetState() == TransactionState::ABORTED) {
-    return false;
-  }
 
   txn_id_t txn_id = txn->GetTransactionId();
   for (auto reqit = lock_table_[rid].request_queue_.begin(); reqit !=
@@ -158,8 +189,9 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
       reqit++;
     }
   }
-
-  txn->SetState(TransactionState::SHRINKING);
+  if (txn->GetState() == TransactionState::GROWING) {
+    txn->SetState(TransactionState::SHRINKING);
+  }
   lock_table_[rid].cv_.notify_all();
   return true;
 }
