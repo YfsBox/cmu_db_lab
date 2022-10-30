@@ -30,12 +30,28 @@ void DeleteExecutor::Init() {
 bool DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
   Tuple tmp_tup;
   RID tmp_rid;
+  Transaction *txn = exec_ctx_->GetTransaction();
   auto indexes = AbstractExecutor::exec_ctx_->GetCatalog()->GetTableIndexes(info_->name_);
   while (child_executor_->Next(&tmp_tup, &tmp_rid)) {
-    info_->table_->MarkDelete(tmp_rid, AbstractExecutor::exec_ctx_->GetTransaction());
-    for (auto index : indexes) {
-      index->index_->DeleteEntry(tmp_tup.KeyFromTuple(info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()),
-                                 tmp_rid, AbstractExecutor::exec_ctx_->GetTransaction());
+    try {
+      if (txn->IsSharedLocked(tmp_rid)) {
+        exec_ctx_->GetLockManager()->LockUpgrade(txn, tmp_tup.GetRid());
+      } else {
+        exec_ctx_->GetLockManager()->LockExclusive(txn, tmp_tup.GetRid());
+      }
+      txn->AddIntoDeletedPageSet(tmp_tup.GetRid().GetPageId());
+      info_->table_->MarkDelete(tmp_rid, AbstractExecutor::exec_ctx_->GetTransaction());
+      for (auto index : indexes) {
+        IndexWriteRecord index_record(tmp_rid, info_->oid_, WType::DELETE, tmp_tup, index->index_oid_,
+                                      exec_ctx_->GetCatalog());
+        txn->AppendTableWriteRecord(index_record);
+        index->index_->DeleteEntry(
+            tmp_tup.KeyFromTuple(info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
+            AbstractExecutor::exec_ctx_->GetTransaction());
+      }
+      exec_ctx_->GetLockManager()->Unlock(txn, tmp_tup.GetRid());
+    } catch (TransactionAbortException &e) {
+      return false;
     }
   }
   return false;

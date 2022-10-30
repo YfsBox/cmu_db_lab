@@ -111,7 +111,7 @@ class LockManager {
     SHARED_OP,
     EXCLUSIVE_OP,
   };
-  bool CanGrant(Transaction *txn, const RID &rid, const LockOpType &mode);
+  bool CanGrant(Transaction *txn, const RID &rid, const LockOpType &mode, std::list<LockRequest>::iterator reqit);
   bool IsConflictLock(Transaction *txn, const LockRequest &request, const LockOpType &locktype) const;
 
   std::mutex latch_;
