@@ -9,20 +9,17 @@
 // Copyright (c) 2015-2019, Carnegie Mellon University Database Group
 //
 //===----------------------------------------------------------------------===//
-
 #include "concurrency/lock_manager.h"
-#include "concurrency/transaction_manager.h"
-
-#include <utility>
 #include <vector>
+#include "concurrency/transaction_manager.h"
 
 namespace bustub {
 
 bool LockManager::IsConflictLock(Transaction *txn, const LockRequest &request, const LockOpType &locktype) const {
   txn_id_t self_txn_id = txn->GetTransactionId();
   if (locktype == LockOpType::SHARED_OP) {
-    return !(request.txn_id_ != self_txn_id && request.lock_mode_ == LockMode::EXCLUSIVE
-             && request.txn_id_ != INVALID_TXN_ID);
+    return !(request.txn_id_ != self_txn_id && request.lock_mode_ == LockMode::EXCLUSIVE &&
+             request.txn_id_ != INVALID_TXN_ID);
   }
   if (locktype == LockOpType::EXCLUSIVE_OP) {
     return (request.txn_id_ == self_txn_id || request.txn_id_ == INVALID_TXN_ID);
@@ -30,8 +27,7 @@ bool LockManager::IsConflictLock(Transaction *txn, const LockRequest &request, c
   return false;
 }
 
-
-bool LockManager::CanGrant(Transaction *txn, const RID &rid, const LockOpType &mode, std::list<LockRequest>::iterator lock_it) {
+bool LockManager::CanGrant(Transaction *txn, const RID &rid, const LockOpType &mode) {
   bool can_grant = true;
   txn_id_t self_txn_id = txn->GetTransactionId();
   auto start_it = lock_table_[rid].request_queue_.begin();
@@ -55,7 +51,6 @@ bool LockManager::CanGrant(Transaction *txn, const RID &rid, const LockOpType &m
   for (auto reit = start_it; reit != lock_table_[rid].request_queue_.end(); ++reit) {
     txn_id_t txn_id = reit->txn_id_;
     if (txn_id > self_txn_id && !IsConflictLock(txn, *reit, mode)) {
-      // LOG_DEBUG("txn %d push ths %d to abort",self_txn_id , txn_id);
       Transaction *tmp_txn = TransactionManager::GetTransaction(txn_id);
       tmp_txn->SetState(TransactionState::ABORTED);
       have_abort = true;
@@ -70,16 +65,22 @@ bool LockManager::CanGrant(Transaction *txn, const RID &rid, const LockOpType &m
 
 bool LockManager::LockShared(Transaction *txn, const RID &rid) {
   std::unique_lock<std::mutex> guard(latch_);
+  if (txn->GetIsolationLevel() == IsolationLevel::READ_UNCOMMITTED) {
+    txn->SetState(TransactionState::ABORTED);
+    LOG_DEBUG("throw 1");
+    throw TransactionAbortException(txn->GetTransactionId(), AbortReason::LOCKSHARED_ON_READ_UNCOMMITTED);
+  }
   if (txn->GetState() != TransactionState::GROWING) {
     txn->SetState(TransactionState::ABORTED);
     if (txn->GetState() == TransactionState::SHRINKING) {
-      throw AbortReason::LOCK_ON_SHRINKING;
+      LOG_DEBUG("throw 2");
+      throw TransactionAbortException(txn->GetTransactionId(), AbortReason::LOCK_ON_SHRINKING);
     }
     return false;
   }
   txn->GetSharedLockSet()->emplace(rid);
   txn_id_t self_txn_id = txn->GetTransactionId();
-  bool can_grant = CanGrant(txn, rid, LockOpType::SHARED_OP, lock_table_[rid].request_queue_.begin());
+  bool can_grant = CanGrant(txn, rid, LockOpType::SHARED_OP);
 
   LockRequest request(self_txn_id, LockMode::SHARED);
   lock_table_[rid].request_queue_.push_front(request);
@@ -88,9 +89,10 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
   while (!can_grant) {
     lock_table_[rid].cv_.wait(guard);
     if (txn->GetState() == TransactionState::ABORTED) {
-      throw AbortReason::DEADLOCK;
+      LOG_DEBUG("throw 3");
+      throw TransactionAbortException(txn->GetTransactionId(), AbortReason::DEADLOCK);
     }
-    can_grant = CanGrant(txn, rid, LockOpType::SHARED_OP, request_it);
+    can_grant = CanGrant(txn, rid, LockOpType::SHARED_OP);
   }
 
   lock_table_[rid].upgrading_ = self_txn_id;
@@ -105,13 +107,13 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
   if (txn->GetState() != TransactionState::GROWING) {
     txn->SetState(TransactionState::ABORTED);
     if (txn->GetState() == TransactionState::SHRINKING) {
-      throw AbortReason::LOCK_ON_SHRINKING;
+      throw TransactionAbortException(txn->GetTransactionId(), AbortReason::LOCK_ON_SHRINKING);
     }
     return false;
   }
   txn->GetExclusiveLockSet()->emplace(rid);
   txn_id_t self_txn_id = txn->GetTransactionId();
-  bool can_grant = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP, lock_table_[rid].request_queue_.begin());
+  bool can_grant = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP);
 
   LockRequest request(self_txn_id, LockMode::EXCLUSIVE);
   lock_table_[rid].request_queue_.push_front(request);
@@ -120,9 +122,9 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
   while (!can_grant) {
     lock_table_[rid].cv_.wait(guard);
     if (txn->GetState() == TransactionState::ABORTED) {
-      return false;
+      throw TransactionAbortException(txn->GetTransactionId(), AbortReason::DEADLOCK);
     }
-    can_grant = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP, request_it);
+    can_grant = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP);
   }
 
   lock_table_[rid].upgrading_ = self_txn_id;
@@ -138,19 +140,19 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
   if (txn->GetState() != TransactionState::GROWING) {
     txn->SetState(TransactionState::ABORTED);
     if (txn->GetState() == TransactionState::SHRINKING) {
-      throw AbortReason::LOCK_ON_SHRINKING;
+      LOG_DEBUG("lock shrinking");
+      throw TransactionAbortException(txn->GetTransactionId(), AbortReason::LOCK_ON_SHRINKING);
     }
     return false;
   }
   auto find_it = lock_table_[rid].request_queue_.begin();
-  for (;find_it != lock_table_[rid].request_queue_.end(); ++find_it) {
+  for (; find_it != lock_table_[rid].request_queue_.end(); ++find_it) {
     if (find_it->granted_ && find_it->lock_mode_ == LockMode::SHARED && find_it->txn_id_ == txn->GetTransactionId()) {
       break;
     }
   }
   if (find_it == lock_table_[rid].request_queue_.end()) {
-    txn->SetState(TransactionState::ABORTED);
-    throw AbortReason::DEADLOCK;
+    return false;
   }
   bool can_upgrade = true;
   auto rest_it = find_it;
@@ -163,7 +165,8 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
   }
   if (!can_upgrade) {
     txn->SetState(TransactionState::ABORTED);
-    throw AbortReason::UPGRADE_CONFLICT;
+    LOG_DEBUG("lock conflict");
+    throw TransactionAbortException(txn->GetTransactionId(), AbortReason::UPGRADE_CONFLICT);
   }
 
   txn->GetSharedLockSet()->erase(rid);
@@ -174,22 +177,23 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
 
 bool LockManager::Unlock(Transaction *txn, const RID &rid) {
   std::unique_lock<std::mutex> guard(latch_);
-  txn->GetSharedLockSet()->erase(rid);
-  txn->GetExclusiveLockSet()->erase(rid);
+
+  if (txn->GetState() != TransactionState::ABORTED) {
+    txn->GetSharedLockSet()->erase(rid);
+    txn->GetExclusiveLockSet()->erase(rid);
+  }
   if (lock_table_[rid].upgrading_ == txn->GetTransactionId()) {
     lock_table_[rid].upgrading_ = INVALID_TXN_ID;
   }
-
   txn_id_t txn_id = txn->GetTransactionId();
-  for (auto reqit = lock_table_[rid].request_queue_.begin(); reqit !=
-       lock_table_[rid].request_queue_.end();) {
+  for (auto reqit = lock_table_[rid].request_queue_.begin(); reqit != lock_table_[rid].request_queue_.end();) {
     if (reqit->txn_id_ == txn_id && reqit->granted_) {
-      reqit = lock_table_[rid].request_queue_.erase(reqit);  // 在容器中进行移除的注意事项
+      reqit = lock_table_[rid].request_queue_.erase(reqit);
     } else {
       reqit++;
     }
   }
-  if (txn->GetState() == TransactionState::GROWING) {
+  if (txn->GetState() == TransactionState::GROWING && txn->GetIsolationLevel() == IsolationLevel::REPEATABLE_READ) {
     txn->SetState(TransactionState::SHRINKING);
   }
   lock_table_[rid].cv_.notify_all();

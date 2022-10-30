@@ -36,7 +36,7 @@ class LockManager {
 
   enum class LockMode { SHARED, EXCLUSIVE };
 
-  class LockRequest {  // 事务，lockmode，是否得到允许
+  class LockRequest {
    public:
     LockRequest(txn_id_t txn_id, LockMode lock_mode) : txn_id_(txn_id), lock_mode_(lock_mode), granted_(false) {}
 
@@ -46,7 +46,7 @@ class LockManager {
   };
   using LockReqIterator = std::list<LockRequest>::iterator;
 
-  class LockRequestQueue {  // 一个处理队列,一个条件变量
+  class LockRequestQueue {
    public:
     std::list<LockRequest> request_queue_;
     // for notifying blocked transactions on this rid
@@ -110,9 +110,8 @@ class LockManager {
   enum class LockOpType {
     SHARED_OP,
     EXCLUSIVE_OP,
-    UPGRADE_OP,
   };
-  bool CanGrant(Transaction *txn, const RID &rid,const LockOpType &mode, std::list<LockRequest>::iterator lock_it);
+  bool CanGrant(Transaction *txn, const RID &rid, const LockOpType &mode);
   bool IsConflictLock(Transaction *txn, const LockRequest &request, const LockOpType &locktype) const;
 
   std::mutex latch_;

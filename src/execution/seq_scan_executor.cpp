@@ -26,21 +26,29 @@ void SeqScanExecutor::Init() {
 
 bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
   TableIterator end_it = info_->table_->End();
+  Transaction *txn = exec_ctx_->GetTransaction();
   auto output_schema = plan_->OutputSchema();
   while (*iterator_ != end_it) {
-    Tuple tup = **iterator_;
-    // LOG_DEBUG("the Tuple is %s",tup.ToString(output_schema).c_str());
-    (*iterator_)++;
-    if (plan_->GetPredicate() == nullptr || plan_->GetPredicate()->Evaluate(&tup, &info_->schema_).GetAs<bool>()) {
-      std::vector<Value> values;
-      values.reserve(output_schema->GetColumnCount());
-      for (size_t i = 0; i < output_schema->GetColumnCount(); i++) {
-        values.push_back(output_schema->GetColumn(i).GetExpr()->Evaluate(&tup, &info_->schema_));
+    try {
+      Tuple tup = **iterator_;
+      exec_ctx_->GetLockManager()->LockShared(txn, tup.GetRid());
+      // LOG_DEBUG("the Tuple is %s",tup.ToString(output_schema).c_str());
+      (*iterator_)++;
+      if (plan_->GetPredicate() == nullptr || plan_->GetPredicate()->Evaluate(&tup, &info_->schema_).GetAs<bool>()) {
+        std::vector<Value> values;
+        values.reserve(output_schema->GetColumnCount());
+        for (size_t i = 0; i < output_schema->GetColumnCount(); i++) {
+          values.push_back(output_schema->GetColumn(i).GetExpr()->Evaluate(&tup, &info_->schema_));
+        }
+        exec_ctx_->GetLockManager()->Unlock(txn, tup.GetRid());
+        Tuple res_tup(std::move(values), output_schema);
+        *tuple = res_tup;
+        *rid = tup.GetRid();
+        return true;
       }
-      Tuple res_tup(std::move(values), output_schema);
-      *tuple = res_tup;
-      *rid = tup.GetRid();
-      return true;
+      exec_ctx_->GetLockManager()->Unlock(txn, tup.GetRid());
+    } catch (TransactionAbortException &exception) {
+      return false;
     }
   }
   return false;
