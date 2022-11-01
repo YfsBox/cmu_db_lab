@@ -35,9 +35,9 @@ bool UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
   while (child_executor_->Next(&tmp_tup, &tmp_rid)) {
     try {
       if (transaction->IsSharedLocked(tmp_rid)) {
-        exec_ctx_->GetLockManager()->LockUpgrade(transaction, tmp_tup.GetRid());
+        exec_ctx_->GetLockManager()->LockUpgrade(transaction, tmp_rid);
       } else {
-        exec_ctx_->GetLockManager()->LockExclusive(transaction, tmp_tup.GetRid());
+        exec_ctx_->GetLockManager()->LockExclusive(transaction, tmp_rid);
       }
       Tuple updated_tup = GenerateUpdatedTuple(tmp_tup);
       assert(table_info_->table_->UpdateTuple(updated_tup, tmp_rid, transaction));

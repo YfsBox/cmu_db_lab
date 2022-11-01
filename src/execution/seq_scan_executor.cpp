@@ -41,7 +41,9 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
         for (size_t i = 0; i < output_schema->GetColumnCount(); i++) {
           values.push_back(output_schema->GetColumn(i).GetExpr()->Evaluate(&tup, &info_->schema_));
         }
-        exec_ctx_->GetLockManager()->Unlock(txn, tup.GetRid());
+        if (txn->GetIsolationLevel() == IsolationLevel::READ_COMMITTED) {
+          exec_ctx_->GetLockManager()->Unlock(txn, tup.GetRid());
+        }
         Tuple res_tup(std::move(values), output_schema);
         *tuple = res_tup;
         *rid = tup.GetRid();
