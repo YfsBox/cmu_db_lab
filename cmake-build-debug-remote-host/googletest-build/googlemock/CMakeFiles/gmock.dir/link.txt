@@ -1,1 +1,0 @@
-/bin/g++ -fPIC   -shared -Wl,-soname,libgmock.so.1.12.1 -o ../../lib/libgmock.so.1.12.1 CMakeFiles/gmock.dir/src/gmock-all.cc.o -Wl,-rpath,/tmp/tmp.IyJU8EsJ7j/cmake-build-debug-remote-host/lib: ../../lib/libgtest.so.1.12.1 -lpthread 

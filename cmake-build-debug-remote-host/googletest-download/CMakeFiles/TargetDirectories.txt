@@ -1,3 +1,0 @@
-/tmp/tmp.IyJU8EsJ7j/cmake-build-debug-remote-host/googletest-download/CMakeFiles/rebuild_cache.dir
-/tmp/tmp.IyJU8EsJ7j/cmake-build-debug-remote-host/googletest-download/CMakeFiles/googletest.dir
-/tmp/tmp.IyJU8EsJ7j/cmake-build-debug-remote-host/googletest-download/CMakeFiles/edit_cache.dir
