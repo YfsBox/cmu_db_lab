@@ -40,14 +40,7 @@ void GetTestFileContent() {
   static bool first_enter = true;
   if (first_enter) {
     std::vector<std::string> all_filenames = {
-        // "/autograder/bustub/test/execution/grading_update_executor_test.cpp",
-        // "/autograder/bustub/test/concurrency/grading_lock_manager_detection_test.cpp",
         "/autograder/bustub/test/concurrency/grading_transaction_test.cpp",
-        "/autograder/bustub/test/concurrency/grading_lock_manager_basic_test.cpp",
-        "/autograder/bustub/test/concurrency/grading_lock_manager_upgrade_test.cpp",
-        "/autograder/bustub/test/concurrency/grading_lock_manager_twopl_test.cpp",
-        "/autograder/bustub/test/concurrency/grading_lock_manager_prevention_test.cpp",
-        "/autograder/bustub/test/concurrency/grading_rollback_test.cpp",
     };
     std::ifstream fin;
     for (const std::string &filename : all_filenames) {

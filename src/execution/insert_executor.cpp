@@ -33,30 +33,53 @@ void InsertExecutor::Init() {
 bool InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
   Tuple tmp_next;
   RID tmp_rid;
-  if (plan_->IsRawInsert()) {
-    uint32_t value_size = plan_->RawValues().size();
-    while (curr_cursor_ < value_size) {
-      auto values = plan_->RawValuesAt(curr_cursor_);
-      Tuple new_tuple(values, &(info_->schema_));
-      info_->table_->InsertTuple(new_tuple, &tmp_rid, AbstractExecutor::exec_ctx_->GetTransaction());
-      auto indexes = exec_ctx_->GetCatalog()->GetTableIndexes(info_->name_);
-      for (auto &index : indexes) {
-        index->index_->InsertEntry(
-            new_tuple.KeyFromTuple(info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
-            AbstractExecutor::exec_ctx_->GetTransaction());
+  Transaction *txn = exec_ctx_->GetTransaction();
+  try {
+    if (plan_->IsRawInsert()) {
+      uint32_t value_size = plan_->RawValues().size();
+      while (curr_cursor_ < value_size) {
+        auto values = plan_->RawValuesAt(curr_cursor_);
+        Tuple new_tuple(values, &(info_->schema_));
+        info_->table_->InsertTuple(new_tuple, &tmp_rid, AbstractExecutor::exec_ctx_->GetTransaction());
+        if (txn->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+          exec_ctx_->GetLockManager()->LockExclusive(txn, tmp_rid);
+        }
+        auto indexes = exec_ctx_->GetCatalog()->GetTableIndexes(info_->name_);
+        for (auto &index : indexes) {
+          IndexWriteRecord new_record(tmp_rid, info_->oid_, WType::INSERT, new_tuple, info_->oid_,
+                                      exec_ctx_->GetCatalog());
+          txn->AppendTableWriteRecord(new_record);
+          index->index_->InsertEntry(
+              new_tuple.KeyFromTuple(info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
+              AbstractExecutor::exec_ctx_->GetTransaction());
+        }
+        curr_cursor_++;
+        if (txn->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+          exec_ctx_->GetLockManager()->Unlock(txn, tmp_rid);
+        }
       }
-      curr_cursor_++;
-    }
-  } else {
-    while (child_executor_->Next(&tmp_next, &tmp_rid)) {
-      info_->table_->InsertTuple(tmp_next, &tmp_rid, exec_ctx_->GetTransaction());
-      auto indexes = exec_ctx_->GetCatalog()->GetTableIndexes(info_->name_);
-      for (auto &index : indexes) {
-        index->index_->InsertEntry(
-            tmp_next.KeyFromTuple(info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
-            AbstractExecutor::exec_ctx_->GetTransaction());
+    } else {
+      while (child_executor_->Next(&tmp_next, &tmp_rid)) {
+        info_->table_->InsertTuple(tmp_next, &tmp_rid, exec_ctx_->GetTransaction());
+        if (txn->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+          exec_ctx_->GetLockManager()->LockExclusive(txn, tmp_rid);
+        }
+        auto indexes = exec_ctx_->GetCatalog()->GetTableIndexes(info_->name_);
+        for (auto &index : indexes) {
+          IndexWriteRecord new_record(tmp_rid, info_->oid_, WType::INSERT, tmp_next, info_->oid_,
+                                      exec_ctx_->GetCatalog());
+          txn->AppendTableWriteRecord(new_record);
+          index->index_->InsertEntry(
+              tmp_next.KeyFromTuple(info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
+              AbstractExecutor::exec_ctx_->GetTransaction());
+        }
+        if (txn->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+          exec_ctx_->GetLockManager()->Unlock(txn, tmp_rid);
+        }
       }
     }
+  } catch (TransactionAbortException &e) {
+    return false;
   }
   return false;
 }

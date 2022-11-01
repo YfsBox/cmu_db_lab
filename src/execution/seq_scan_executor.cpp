@@ -31,8 +31,9 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
   while (*iterator_ != end_it) {
     try {
       Tuple tup = **iterator_;
-      exec_ctx_->GetLockManager()->LockShared(txn, tup.GetRid());
-      // LOG_DEBUG("the Tuple is %s",tup.ToString(output_schema).c_str());
+      if (txn->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+        exec_ctx_->GetLockManager()->LockShared(txn, tup.GetRid());
+      }
       (*iterator_)++;
       if (plan_->GetPredicate() == nullptr || plan_->GetPredicate()->Evaluate(&tup, &info_->schema_).GetAs<bool>()) {
         std::vector<Value> values;
@@ -46,7 +47,9 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
         *rid = tup.GetRid();
         return true;
       }
-      exec_ctx_->GetLockManager()->Unlock(txn, tup.GetRid());
+      if (txn->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+        exec_ctx_->GetLockManager()->Unlock(txn, tup.GetRid());
+      }
     } catch (TransactionAbortException &exception) {
       return false;
     }

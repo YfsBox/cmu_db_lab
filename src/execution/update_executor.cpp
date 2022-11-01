@@ -33,15 +33,33 @@ bool UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
   Transaction *transaction = AbstractExecutor::exec_ctx_->GetTransaction();
   auto indexes = AbstractExecutor::exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
   while (child_executor_->Next(&tmp_tup, &tmp_rid)) {
-    Tuple updated_tup = GenerateUpdatedTuple(tmp_tup);
-    assert(table_info_->table_->UpdateTuple(updated_tup, tmp_rid, transaction));
-    for (auto index : indexes) {
-      index->index_->DeleteEntry(
-          tmp_tup.KeyFromTuple(table_info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
-          transaction);
-      index->index_->InsertEntry(
-          tmp_tup.KeyFromTuple(table_info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
-          transaction);
+    try {
+
+      if (transaction->IsSharedLocked(tmp_rid)) {
+        exec_ctx_->GetLockManager()->LockUpgrade(transaction, tmp_tup.GetRid());
+      } else {
+        exec_ctx_->GetLockManager()->LockExclusive(transaction, tmp_tup.GetRid());
+      }
+      Tuple updated_tup = GenerateUpdatedTuple(tmp_tup);
+      assert(table_info_->table_->UpdateTuple(updated_tup, tmp_rid, transaction));
+      for (auto index : indexes) {
+
+        IndexWriteRecord index_record_delete(tmp_tup.GetRid(), table_info_->oid_, WType::DELETE, tmp_tup, index->index_oid_,
+                                      exec_ctx_->GetCatalog());
+        IndexWriteRecord index_record_insert(updated_tup.GetRid(), table_info_->oid_, WType::INSERT, updated_tup, index->index_oid_,
+                                             exec_ctx_->GetCatalog());
+        transaction->AppendTableWriteRecord(index_record_delete);
+        transaction->AppendTableWriteRecord(index_record_insert);
+        index->index_->DeleteEntry(
+            tmp_tup.KeyFromTuple(table_info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
+            transaction);
+        index->index_->InsertEntry(
+            tmp_tup.KeyFromTuple(table_info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
+            transaction);
+      }
+      exec_ctx_->GetLockManager()->Unlock(transaction, tmp_tup.GetRid());
+    } catch (TransactionAbortException &e) {
+      return false;
     }
   }
   return false;
