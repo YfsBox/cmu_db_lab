@@ -41,7 +41,9 @@ bool InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
         auto values = plan_->RawValuesAt(curr_cursor_);
         Tuple new_tuple(values, &(info_->schema_));
         info_->table_->InsertTuple(new_tuple, &tmp_rid, AbstractExecutor::exec_ctx_->GetTransaction());
-        if (txn->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+        if (txn->IsSharedLocked(tmp_rid)) {
+          exec_ctx_->GetLockManager()->LockUpgrade(txn, tmp_rid);
+        } else {
           exec_ctx_->GetLockManager()->LockExclusive(txn, tmp_rid);
         }
         auto indexes = exec_ctx_->GetCatalog()->GetTableIndexes(info_->name_);
@@ -54,14 +56,16 @@ bool InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
               AbstractExecutor::exec_ctx_->GetTransaction());
         }
         curr_cursor_++;
-        if (txn->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+        if (txn->GetIsolationLevel() != IsolationLevel::REPEATABLE_READ) {
           exec_ctx_->GetLockManager()->Unlock(txn, tmp_rid);
         }
       }
     } else {
       while (child_executor_->Next(&tmp_next, &tmp_rid)) {
         info_->table_->InsertTuple(tmp_next, &tmp_rid, exec_ctx_->GetTransaction());
-        if (txn->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+        if (txn->IsSharedLocked(tmp_rid)) {
+          exec_ctx_->GetLockManager()->LockUpgrade(txn, tmp_rid);
+        } else {
           exec_ctx_->GetLockManager()->LockExclusive(txn, tmp_rid);
         }
         auto indexes = exec_ctx_->GetCatalog()->GetTableIndexes(info_->name_);
@@ -73,7 +77,7 @@ bool InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
               tmp_next.KeyFromTuple(info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
               AbstractExecutor::exec_ctx_->GetTransaction());
         }
-        if (txn->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+        if (txn->GetIsolationLevel() != IsolationLevel::REPEATABLE_READ) {
           exec_ctx_->GetLockManager()->Unlock(txn, tmp_rid);
         }
       }

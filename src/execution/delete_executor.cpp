@@ -49,7 +49,9 @@ bool DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
             tmp_tup.KeyFromTuple(info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()), tmp_rid,
             AbstractExecutor::exec_ctx_->GetTransaction());
       }
-      exec_ctx_->GetLockManager()->Unlock(txn, tmp_tup.GetRid());
+      if (txn->GetIsolationLevel() != IsolationLevel::REPEATABLE_READ) {
+        exec_ctx_->GetLockManager()->Unlock(txn, tmp_tup.GetRid());
+      }
     } catch (TransactionAbortException &e) {
       return false;
     }

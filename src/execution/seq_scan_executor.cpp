@@ -47,7 +47,7 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
         *rid = tup.GetRid();
         return true;
       }
-      if (txn->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+      if (txn->GetIsolationLevel() == IsolationLevel::READ_COMMITTED) {
         exec_ctx_->GetLockManager()->Unlock(txn, tup.GetRid());
       }
     } catch (TransactionAbortException &exception) {

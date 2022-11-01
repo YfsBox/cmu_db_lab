@@ -77,9 +77,6 @@ bool LockManager::CanGrant(Transaction *txn, const RID &rid, const LockOpType &m
 
 bool LockManager::LockShared(Transaction *txn, const RID &rid) {
   std::unique_lock<std::mutex> guard(latch_);
-  if (txn->IsSharedLocked(rid) || txn->IsExclusiveLocked(rid)) {
-    return true;
-  }
   if (txn->GetIsolationLevel() == IsolationLevel::READ_UNCOMMITTED) {
     txn->SetState(TransactionState::ABORTED);
     throw TransactionAbortException(txn->GetTransactionId(), AbortReason::LOCKSHARED_ON_READ_UNCOMMITTED);
@@ -87,6 +84,9 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
   if (txn->GetState() != TransactionState::GROWING) {
     txn->SetState(TransactionState::ABORTED);
     return false;
+  }
+  if (txn->IsSharedLocked(rid) || txn->IsExclusiveLocked(rid)) {
+    return true;
   }
   txn_id_t self_txn_id = txn->GetTransactionId();
   LockRequest request(self_txn_id, LockMode::SHARED);
@@ -96,7 +96,6 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
 
   while (!can_grant) {
     lock_table_[rid].cv_.wait(guard);
-    // LOG_DEBUG("txn %d is notify", txn->GetTransactionId());
     if (txn->GetState() == TransactionState::ABORTED) {
       lock_table_[rid].cv_.notify_all();
       throw TransactionAbortException(txn->GetTransactionId(), AbortReason::DEADLOCK);
@@ -113,14 +112,13 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
 
 bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
   std::unique_lock<std::mutex> guard(latch_);
-  if (txn->IsExclusiveLocked(rid)) {
-    return true;
-  }
   if (txn->GetState() != TransactionState::GROWING) {
     txn->SetState(TransactionState::ABORTED);
     return false;
   }
-
+  if (txn->IsExclusiveLocked(rid)) {
+    return true;
+  }
   txn_id_t self_txn_id = txn->GetTransactionId();
   LockRequest request(self_txn_id, LockMode::EXCLUSIVE);
   lock_table_[rid].request_queue_.push_front(request);
@@ -197,11 +195,14 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
       reqit++;
     }
   }
-  if (txn->GetState() == TransactionState::GROWING && txn->GetIsolationLevel() == IsolationLevel::REPEATABLE_READ) {
+  if (txn->GetState() != TransactionState::GROWING) {
+    lock_table_[rid].cv_.notify_all();
+    return true;
+  }
+  if (txn->GetIsolationLevel() == IsolationLevel::REPEATABLE_READ) {
     txn->SetState(TransactionState::SHRINKING);
   }
   lock_table_[rid].cv_.notify_all();
-  // LOG_DEBUG("notify after unlock when txn %d", txn->GetTransactionId());
   return true;
 }
 
