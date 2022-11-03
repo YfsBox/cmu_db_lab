@@ -157,28 +157,37 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
     }
     return false;
   }
+  bool is_erase = false;
   auto find_it = lock_table_[rid].request_queue_.begin();
-  for (; find_it != lock_table_[rid].request_queue_.end(); find_it++) {
+  for (; find_it != lock_table_[rid].request_queue_.end();) {
     if (find_it->granted_ && find_it->lock_mode_ == LockMode::SHARED && find_it->txn_id_ == txn->GetTransactionId()) {
-      break;
+      find_it = lock_table_[rid].request_queue_.erase(find_it);
+      is_erase = true;
+    } else {
+      find_it++;
     }
   }
-  if (find_it == lock_table_[rid].request_queue_.end()) {
+  if (!is_erase) {
     return false;
   }
-  bool can_upgrade = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP, find_it);
+  LockRequest request(txn->GetTransactionId(), LockMode::EXCLUSIVE);
+  lock_table_[rid].request_queue_.push_front(request);
+  auto request_it = lock_table_[rid].request_queue_.begin();
+  bool can_upgrade = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP, request_it);
+
   while (!can_upgrade) {
     lock_table_[rid].cv_.wait(guard);
     if (txn->GetState() == TransactionState::ABORTED) {
+      lock_table_[rid].cv_.notify_all();
       throw TransactionAbortException(txn->GetTransactionId(), AbortReason::DEADLOCK);
     }
-    can_upgrade = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP, find_it);
+    can_upgrade = CanGrant(txn, rid, LockOpType::EXCLUSIVE_OP, request_it);
   }
 
   txn->GetSharedLockSet()->erase(rid);
   txn->GetExclusiveLockSet()->emplace(rid);
   lock_table_[rid].upgrading_ = txn->GetTransactionId();
-  find_it->lock_mode_ = LockMode::EXCLUSIVE;
+  lock_table_[rid].cv_.notify_all();
   return true;
 }
 
